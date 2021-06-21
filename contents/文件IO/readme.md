@@ -1,8 +1,14 @@
 # 概述
 
+文件描述符：非负整数，指代打开的文件。
+
 标准文件描述符：
 
 ![](./img/std_fd.png)
+
+# 通用 IO
+
+所有类型的文件和设备驱动都实现相同的 IO 接口，这保证了 IO 操作的通用性。
 
 # 打开文件
 
@@ -17,8 +23,8 @@ int open(const char *pathname, int flags);
 int open(const char *pathname, int flags, mode_t mode);
 ```
 
-- `pathname` 如果是符号链接，会对其解引用。
-- 调用成功，返回进程未使用文件描述符中数值最小的值，失败返回 -1，并且设置 errno。
+- `pathname` 如果是符号链接，会对其解引用
+- 调用成功，返回进程未使用文件描述符中数值最小的值，失败返回 -1，并且设置 `errno`
 
 ### flags 参数
 
@@ -99,7 +105,7 @@ ssize_t read(int fd, void *buf, size_t count);
 
 - `count` 指定最多读取的字节数
 - `buf` 指定的缓冲区，应该至少具有 `count` 个字节
-- 调用成功返回实际读取的字节数，该值可能小于期望值，如果遇到文件结束 `EOF` 则返回 0，如果出错，返回 -1
+- 调用成功返回实际读取的字节数，该值可能小于期望值，如果遇到文件结束 `EOF` 则返回 0，如果出错，返回 -1，并且设置 `errno`
 
 # 数据写入文件
 
@@ -109,7 +115,7 @@ ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
 ```
 
-- 调用成功返回实际写入的字节数，该值可能小于 count，如果出错，返回 -1
+- 调用成功返回实际写入的字节数，该值可能小于 count，如果出错，返回 -1，并且设置 `errno`
 
 # 关闭文件
 
@@ -136,7 +142,10 @@ if(close(fd) == -1)
 
 # 改变文件偏移量
 
-每个打开的文件，内核都会记录其文件偏移量，文件偏移量是执行下一次 `read()` 或 `write()` 操作的文件起始位置
+文件偏移量：
+
+- 每个打开的文件，内核都会记录其文件偏移量，文件偏移量是执行下一次 `read()` 或 `write()` 操作的文件起始位置
+- 文件打开时，会将文件偏移量设置为指向文件开始，以后每次 `read()` 和 `write()` 调用都将自动调整偏移量，以指向已读或者已写数据的下一个字节
 
 ```
 #include <sys/types.h>
@@ -149,6 +158,23 @@ off_t lseek(int fd, off_t offset, int whence);
   - `SEEK_SET` ： 从文件头部开始，`offset` 必须是非负数
   - `SEEK_CUR` ： 从文件当前位置开始，`offset` 可正可负
   - `SEEK_END` ： 从文件尾部开始，`offset` 可正可负
+- 调用成功返回新的文件偏移量，失败返回 -1，并且设置 `errno`
+- 并非适用于所有类型的文件，应用于管道，FIFO，SOCKET 或者终端将调用失败，设置错误 `ESPIPE`
 
+## 文件空洞
 
+文件结尾后到新写入数据间的这段空间称为文件空洞。
 
+- 读取空洞文件将会返回以 `0` 字节填充的缓冲区
+- 文件空洞不占用任何磁盘空间，直到后续在空洞文件中写入数据，文件系统才会为之分配磁盘块
+
+# ioctl
+
+```
+#include <sys/ioctl.h>
+
+int ioctl(int fd, unsigned long request, ...);
+```
+
+- `ioctl()`  系统调用为执行文件和设备操作提供了一种多用途机制
+- `ioctl()` 根据命令字类型决定参数类型
