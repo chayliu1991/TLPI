@@ -1,16 +1,16 @@
-include ../Makefile.inc
+CC = gcc
+Targets = copy readv largefile
 
+all : $(Targets)
 
-GEN_EXE = copy
+copy : 
+	$(CC) $(CFLAGS) -o copy copy.c
 
-EXE = ${GEN_EXE}
+readv : 
+	$(CC) $(CFLAGS) -o readv readv.c
 
-all:${EXE}
-allgen: ${GEN_EXE}
-clean: ${GEN_EXE}
+largefile : 
+	$(CC) $(CFLAGS) -o largefile largefile.c
+
 clean:
-	${RM} ${EXE} *.o
-showall:
-	@ echo ${EXE}
-
-	
+	-rm -rf $(Targets)

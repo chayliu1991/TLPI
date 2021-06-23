@@ -51,6 +51,7 @@ int open(const char *pathname, int flags, mode_t mode);
 - `O_EXCL`
   - 此标志与 `O_CREAT` 结合使用，如果文件已经存在，则不会打开文件，并且 `open` 返回错误 `EEXIST`
   - 此标志确保了 `open` 就是用于创建文件
+  - 文件是否存在的检查和创建文件是原子操作
 - `O_LARGEFILE`
   - 支持以大文件方式打开文件，在 32 位操作系统中使用此标志，以支持大文件操作
 - `ONOATIME`
