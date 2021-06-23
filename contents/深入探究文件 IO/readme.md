@@ -253,6 +253,23 @@ ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt,off_t offset);
 
 适用于既想分散-集中 IO，又不愿意受制于当前文件偏移量的应用程序。
 
+# 截断文件
+
+```
+#include <unistd.h>
+#include <sys/types.h>
+
+int truncate(const char *path, off_t length);
+int ftruncate(int fd, off_t length);
+```
+
+- 将文件大小设置为 `length` 参数指定的值
+- 若文件当前长度大于 `length` 将会丢弃超出的部分，如果小于 `length` ：
+  - `ftruncate()` 要么扩展文件，要么返回错误
+  - `truncate()` 总是扩展文件
+
+- `truncate()` 指定文件名称直接操作，`ftruncate()` 需要先将文件打开获取其文件描述符
+
 # 非阻塞 IO
 
 打开文件时指定 `O_NONBLOCK` 标志，目的有二：
@@ -304,25 +321,67 @@ printf("offset = %lld\n",(long long)offset);
 
 # /dev/fd 目录
 
+对于每个进程，内核都提供一个特殊的虚拟目录 `/dev/fd`，该目录中包含 `/dev/fd/n` 形式的文件名，`n` 表示进程打开的文件描述符编号。
 
+打开  `/dev/fd` 目录中的一个文件等同于复制相应的文件描述符，下面的操作等价：
 
+```
+fd = open("/dev/fd/1",O_WRONLY);
+fd = dup(1);
+```
 
+ `/dev/fd` 本质上是一个符号链接，链接到 `/proc/self/fd` 目录。
 
+程序中很少使用  `/dev/fd` 目录中的文件，但在 shell 中会用到：
 
+```
+ls | diff /dev/fd/0 oldfilelist
+```
 
+系统定义了 3 个符号链接：
 
+```
+/def/stdin   --> /dev/fd/0
+/def/stdout  --> /dev/fd/1
+/def/stderr  --> /dev/fd/2
+```
 
+# 创建临时文件
 
+创建临时文件在运行期间使用，程序终止后即行删除。
 
+```
+#include <stdlib.h>
 
+int mkstemp(char *template);
+```
 
- 
+- `mkstemp()` 生成一个唯一文件名并打开该文件，返回一个可用于 IO 调用的文件描述符
+- 模板参数采用路径名形式，其中最后 6 个字符必须是  `XXXXXX`，这 6 个字符将被替换，以保证文件名的唯一性，其修改后的字符串将通过 `template` 参数传回
+- 文件拥有者对 `mkstemp()`  建立的文件拥有读写权限，其他用户没有任何操作权限，且打开文件时使用了 `O_EXCL` 标志，以保证调用者以独占式访问文件
+- 通常打开临时文件不久，程序就会使用  `unlink`  系统调用将其删除
 
+```
+int fd;
+char template = "/tmp/somestringXXXXXX";
+fd = mkstemp(template);
+if(fd < 0)
+	errExit("mkstemp");
+unlink(template);
+if(close(fd)  < 0)
+	errExit("close");
+```
 
+`tmpnam()`，`tempnam()` 和 `mktemp()` 也能生成唯一的文件名，然而这些函数可能会导致应用程序出现安全漏洞，应当避免使用这些函数。
 
+`tmpfile()` 创建一个名称唯一的临时文件，并以读写方式打开，并且指定了 `O_EXCL`  标志，以防止可能性极小的冲突，即另一个进程已经创建了一个同名文件。
 
+```
+#include <stdio.h>
 
+FILE *tmpfile(void);
+```
 
-
-
+- 执行成功，将返回一个文件流供 `stdio` 库函数使用
+- 文件流关闭后将会自动删除临时文件，为到达这一目的，文件打开后，内部会立即调用 `unlink` 来删除该文件
 
