@@ -175,6 +175,31 @@ int posix_fadvise(int fd, off_t offset, off_t len, int advice);
 
 块大小是指设备的物理块大小，通常为 512 字节，不遵守上述任一限制将导致  `EINVAL`  错误。
 
+# 混合使用库函数和系统调用进行文件 IO
+
+```
+#include <stdio.h>
+
+int fileno(FILE* stream);
+FILE* fdopen(int fd,const char* mode);
+```
+
+- `fileno` ： 给定一个文件流，返回相应的文件描述符
+- `fdopen` ：给定一个文件描述符，创建一个使用该文件描述符进行文件 IO 的相应流，`mode` 参数与 `fopen()` 的参数含义相同，如果该参数与文件描述符 fd 的访问模式不一致，则调用将失败
+
+stdio 库函数结合系统 IO 调用时，必须重视缓冲问题：
+
+- IO 系统调用会直接将数据传递到内核缓冲区的高速缓存中
+- stdio 库函数会等到用户空间的流缓冲区填满时，再通过 系统调用传递给内核缓冲区高速缓存
+
+使用 `fflush` 来规避问题是明智之举，也可以使用 `setvbuf()` 或 `setbuf()`  使缓冲区失效，但是这可能影响到 IO 性能
+
+
+
+
+
+
+
 
 
 
