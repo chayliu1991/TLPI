@@ -148,6 +148,70 @@ void *realloc(void *ptr, size_t size);
 
 ### 分配对齐的内存
 
+```
+#include <malloc.h>
+
+void *memalign(size_t boundary, size_t size);
+```
+
+- 起始地址是 `boundary` 的整数倍，`boundary` 必须是 2 的整数次幂 
+- `memalign()` 并非在所有的 UNIX 实现上都存在，大多数 `memalign()` 的其他 UNIX 实现要求引用 `<stdlib.h>` 
+
+```
+#include <stdlib.h>
+
+int posix_memalign(void **memptr, size_t alignment, size_t size);
+```
+
+- `posix_memalign()` 只在少数 UNIX 实现，与 `memalign()` 有两个方面不同：
+  - 已分配的内存地址通过 `memptr` 返回
+  - 内存与 `alignment` 参数的整数倍对齐，`alignment` 必须是 `sizeof(void*)` 与 2 的整数次幂两者之间的乘积
+- 出错时不返回 -1，而是直接返回一个错误号
+
+# 在堆栈上分配内存
+
+```
+#include <alloca.h>
+
+void *alloca(size_t size);
+```
+
+- `alloca()` 通过增加栈帧的大小从堆栈上分配内存
+
+- 不能也不需要调用 `free()` 来释放 `alloca()`  分配的内存
+
+- 如果调用 `alloca()`  造成堆栈溢出，则程序的行为是无法预知的
+
+- 不要在参数列表中调用 `alloca()` ，这会使得分配的堆栈空间出现在当前函数参数的空间内：
+
+  ``` 
+  func(x,alloca(size),z) //@ 错误的示范
+  
+  //@ 必须按下面的方式进行
+  void* y;
+  y = alloca(size);
+  func(x,y,z);
+  ```
+
+- 使用 `alloca()`  来分配内存相对于  `malloc()`  有一定优势：
+
+  -  `alloca()` 分配内存的速度要快于  `malloc()`，因为编译器将 `alloca()`  作为内联代码处理，而是通过直接调整堆栈指针来实现的
+  -  `alloca()` 不需要维护空闲内存块列表
+  -  `alloca()` 分配的内存随着栈帧的移除会自动释放，亦即当调用  `alloca()` 的函数返回之时，因为函数返回时所执行的代码会重置栈指针寄存器，使其指向前一帧的末尾
+  - 在信号处理程序中调用 `longjump()`  或 `siglongjump()` 以执行非局部跳转时，`alloca()` 的作用尤其突出，此时在 "起跳" 和 "落地" 之间的函数如果使用 `malloc()` 则很难避免内存泄漏
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
