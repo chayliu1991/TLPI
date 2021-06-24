@@ -56,6 +56,7 @@ main(int argc, char *argv[])
     if (numRead == -1)
         errExit("read");
     printf("Read %ld bytes\n", (long) numRead);
+    
 
     exit(EXIT_SUCCESS);
 }
