@@ -1,0 +1,111 @@
+SETENV(3)                                                                                                   Linux Programmer's Manual                                                                                                   SETENV(3)
+
+NNAAMMEE
+       setenv - change or add an environment variable
+
+SSYYNNOOPPSSIISS
+       ##iinncclluuddee <<ssttddlliibb..hh>>
+
+       iinntt sseetteennvv((ccoonnsstt cchhaarr **_n_a_m_e,, ccoonnsstt cchhaarr **_v_a_l_u_e,, iinntt _o_v_e_r_w_r_i_t_e));;
+
+       iinntt uunnsseetteennvv((ccoonnsstt cchhaarr **_n_a_m_e));;
+
+   Feature Test Macro Requirements for glibc (see ffeeaattuurree__tteesstt__mmaaccrrooss(7)):
+
+       sseetteennvv(), uunnsseetteennvv():
+           _BSD_SOURCE || _POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600
+
+DDEESSCCRRIIPPTTIIOONN
+       The  sseetteennvv() function adds the variable _n_a_m_e to the environment with the value _v_a_l_u_e, if _n_a_m_e does not already exist.  If _n_a_m_e does exist in the environment, then its value is changed to _v_a_l_u_e if _o_v_e_r_w_r_i_t_e is nonzero; if _o_v_e_r_w_r_i_t_e is
+       zero, then the value of _n_a_m_e is not changed (and sseetteennvv() returns a success status).  This function makes copies of the strings pointed to by _n_a_m_e and _v_a_l_u_e (by contrast with ppuutteennvv(3)).
+
+       The uunnsseetteennvv() function deletes the variable _n_a_m_e from the environment.  If _n_a_m_e does not exist in the environment, then the function succeeds, and the environment is unchanged.
+
+RREETTUURRNN VVAALLUUEE
+       The sseetteennvv() function returns zero on success, or -1 on error, with _e_r_r_n_o set to indicate the cause of the error.
+
+       The uunnsseetteennvv() function returns zero on success, or -1 on error, with _e_r_r_n_o set to indicate the cause of the error.
+
+EERRRROORRSS
+       EEIINNVVAALL _n_a_m_e is NULL, points to a string of length 0, or contains an '=' character.
+
+       EENNOOMMEEMM Insufficient memory to add a new variable to the environment.
+
+AATTTTRRIIBBUUTTEESS
+       For an explanation of the terms used in this section, see aattttrriibbuutteess(7).
+
+       ┌─────────────────────┬───────────────┬─────────────────────┐
+       │IInntteerrffaaccee            │ AAttttrriibbuuttee     │ VVaalluuee               │
+       ├─────────────────────┼───────────────┼─────────────────────┤
+       │sseetteennvv(), uunnsseetteennvv() │ Thread safety │ MT-Unsafe const:env │
+       └─────────────────────┴───────────────┴─────────────────────┘
+CCOONNFFOORRMMIINNGG TTOO
+       POSIX.1-2001, POSIX.1-2008, 4.3BSD.
+
+NNOOTTEESS
+       POSIX.1 does not require sseetteennvv() or uunnsseetteennvv() to be reentrant.
+
+       Prior to glibc 2.2.2, uunnsseetteennvv() was prototyped as returning _v_o_i_d; more recent glibc versions follow the POSIX.1-compliant prototype shown in the SYNOPSIS.
+
+BBUUGGSS
+       POSIX.1 specifies that if _n_a_m_e contains an '=' character, then sseetteennvv() should fail with the error EEIINNVVAALL; however, versions of glibc before 2.3.4 allowed an '=' sign in _n_a_m_e.
+
+SSEEEE AALLSSOO
+       cclleeaarreennvv(3), ggeetteennvv(3), ppuutteennvv(3), eennvviirroonn(7)
+
+CCOOLLOOPPHHOONN
+       This page is part of release 4.04 of the Linux _m_a_n_-_p_a_g_e_s project.  A description of the project, information about reporting bugs, and the latest version of this page, can be found at http://www.kernel.org/doc/man-pages/.
+
+GNU                                                                                                                 2015-08-08                                                                                                          SETENV(3)
+CLEARENV(3)                                                                                                 Linux Programmer's Manual                                                                                                 CLEARENV(3)
+
+NNAAMMEE
+       clearenv - clear the environment
+
+SSYYNNOOPPSSIISS
+       ##iinncclluuddee <<ssttddlliibb..hh>>
+
+       iinntt cclleeaarreennvv((vvooiidd));;
+
+   Feature Test Macro Requirements for glibc (see ffeeaattuurree__tteesstt__mmaaccrrooss(7)):
+
+       cclleeaarreennvv(): _SVID_SOURCE || _BSD_SOURCE
+
+DDEESSCCRRIIPPTTIIOONN
+       The cclleeaarreennvv() function clears the environment of all name-value pairs and sets the value of the external variable _e_n_v_i_r_o_n to NULL.
+
+RREETTUURRNN VVAALLUUEE
+       The cclleeaarreennvv() function returns zero on success, and a nonzero value on failure.
+
+VVEERRSSIIOONNSS
+       Available since glibc 2.0.
+
+AATTTTRRIIBBUUTTEESS
+       For an explanation of the terms used in this section, see aattttrriibbuutteess(7).
+
+       ┌───────────┬───────────────┬─────────────────────┐
+       │IInntteerrffaaccee  │ AAttttrriibbuuttee     │ VVaalluuee               │
+       ├───────────┼───────────────┼─────────────────────┤
+       │cclleeaarreennvv() │ Thread safety │ MT-Unsafe const:env │
+       └───────────┴───────────────┴─────────────────────┘
+
+CCOONNFFOORRMMIINNGG TTOO
+       Various  UNIX  variants  (DG/UX, HP-UX, QNX, ...).  POSIX.9 (bindings for FORTRAN77).  POSIX.1-1996 did not accept cclleeaarreennvv() and ppuutteennvv(3), but changed its mind and scheduled these functions for some later issue of this standard (cf.
+       B.4.6.1).  However, POSIX.1-2001 adds only ppuutteennvv(3), and rejected cclleeaarreennvv().
+
+NNOOTTEESS
+       Used in security-conscious applications.  If it is unavailable the assignment
+
+           environ = NULL;
+
+       will probably do.
+
+       The DG/UX and Tru64 man pages write: If _e_n_v_i_r_o_n has been modified by anything other than the ppuutteennvv(3), ggeetteennvv(3), or cclleeaarreennvv() functions, then cclleeaarreennvv() will return an error and the process environment will remain unchanged.
+
+SSEEEE AALLSSOO
+       ggeetteennvv(3), ppuutteennvv(3), sseetteennvv(3), uunnsseetteennvv(3), eennvviirroonn(7)
+
+CCOOLLOOPPHHOONN
+       This page is part of release 4.04 of the Linux _m_a_n_-_p_a_g_e_s project.  A description of the project, information about reporting bugs, and the latest version of this page, can be found at http://www.kernel.org/doc/man-pages/.
+
+Linux                                                                                                               2015-07-23                                                                                                        CLEARENV(3)
