@@ -1,0 +1,38 @@
+GETPID(2)                                                                                                   Linux Programmer's Manual                                                                                                   GETPID(2)
+
+NNAAMMEE
+       getpid, getppid - get process identification
+
+SSYYNNOOPPSSIISS
+       ##iinncclluuddee <<ssyyss//ttyyppeess..hh>>
+       ##iinncclluuddee <<uunniissttdd..hh>>
+
+       ppiidd__tt ggeettppiidd((vvooiidd));;
+       ppiidd__tt ggeettppppiidd((vvooiidd));;
+
+DDEESSCCRRIIPPTTIIOONN
+       ggeettppiidd() returns the process ID of the calling process.  (This is often used by routines that generate unique temporary filenames.)
+
+       ggeettppppiidd() returns the process ID of the parent of the calling process.
+
+EERRRROORRSS
+       These functions are always successful.
+
+CCOONNFFOORRMMIINNGG TTOO
+       POSIX.1-2001, POSIX.1-2008, 4.3BSD, SVr4.
+
+NNOOTTEESS
+       If the caller's parent is in a different PID namespace (see ppiidd__nnaammeessppaacceess(7)), ggeettppppiidd() returns 0.
+
+   CC lliibbrraarryy//kkeerrnneell ddiiffffeerreenncceess
+       Since  glibc version 2.3.4, the glibc wrapper function for ggeettppiidd() caches PIDs, so as to avoid additional system calls when a process calls ggeettppiidd() repeatedly.  Normally this caching is invisible, but its correct operation relies on
+       support in the wrapper functions for ffoorrkk(2), vvffoorrkk(2), and cclloonnee(2): if an application bypasses the glibc wrappers for these system calls by using ssyyssccaallll(2), then a call to ggeettppiidd() in the child will return the wrong  value  (to  be
+       precise: it will return the PID of the parent process).  See also cclloonnee(2) for discussion of a case where ggeettppiidd() may return the wrong value even when invoking cclloonnee(2) via the glibc wrapper function.
+
+SSEEEE AALLSSOO
+       cclloonnee(2), ffoorrkk(2), kkiillll(2), eexxeecc(3), mmkksstteemmpp(3), tteemmppnnaamm(3), ttmmppffiillee(3), ttmmppnnaamm(3), ccrreeddeennttiiaallss(7), ppiidd__nnaammeessppaacceess(7)
+
+CCOOLLOOPPHHOONN
+       This page is part of release 4.04 of the Linux _m_a_n_-_p_a_g_e_s project.  A description of the project, information about reporting bugs, and the latest version of this page, can be found at http://www.kernel.org/doc/man-pages/.
+
+Linux                                                                                                               2015-07-23                                                                                                          GETPID(2)
