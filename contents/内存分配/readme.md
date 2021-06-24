@@ -28,9 +28,6 @@ void *sbrk(intptr_t increment);
 #include <stdlib.h>
 
 void *malloc(size_t size);
-void free(void *ptr);
-void *calloc(size_t nmemb, size_t size);
-void *realloc(void *ptr, size_t size);
 ```
 
 - `malloc()`  在堆上分配 `size` 个字节大小的内存，并返回指向新分配内存起始位置处的指针，其分配的内存未经初始化
@@ -77,11 +74,79 @@ void free(void *ptr);
 - `free()` 将内存块置于空闲列表之上
 - 归还的大小正是依据 `malloc()` 预留的整数值
 
-当将内存块置于空闲内存列表(双向链表)时，`free()`  会使用内存块本身的空间来存放链表指针，将自身添加到列表中。
+当将内存块置于空闲内存列表(双向链表)时，`free()`  会使用内存块本身的空间来存放链表指针，将自身添加到列表中：
 
 ![](./img/free_mem.png)
 
+随着对内存不断地释放和重新分配，空闲列表中的空闲内存会和已经分配的在用内存混杂在一起：
 
+![](./img/free_and_use_mem.png)
+
+避免内存分配相关问题，应该遵循的准则：
+
+- 分配一块内存后，不要改变这块内存范围外的任何内容
+- 释放同一块内存超过一次是错误的，结果是不可预知的
+- 不是经由 `malloc` 函数包中函数返回的指针，决不能在调用  `free()` 函数时使用
+- 避免内存泄漏
+
+### malloc 调试的工具和库
+
+glibc 提供的 malloc 调试工具：
+
+- `mtrace()` 和 `muntrace()` 函数分别在程序打开和关闭对内存分配调用进行跟踪的功能。这些函数要与环境变量 `MALLOC_TRACE`  搭配使用，该变量定义了写入跟踪信息的文件名
+- `mcheck()` 和 `mprobe()` 函数允许对已分配内存块进行一致性检查
+- `MALLOC_CHECK_` 环境变量提供了 `mcheck()` 和 `mprobe()` 函数的功能，区别在于 `MALLOC_CHECK_` 无需对程序进行修改和重新编译，将此变量设置为不同的整数值，可以控制程序对内存分配错误的响应方式：
+  - 0 ： 忽略错误
+  - 1 ：在标准错误输出诊断错误
+  - 调用 `abort()` 来终止程序
+
+### 控制和监控 malloc 函数包
+
+glibc 手册介绍了一系列非标准函数，可以用于监测和控制 malloc 包中的函数：
+
+- `mallopy()` 能修改各项参数，以控制 `malloc()` 所采用的算法
+- `mallinfo()` 返回一个结构，其中包含由  `malloc()` 分配内存的各种统计数据
+
+## 堆上分配内存的其他方法
+
+### 用 `calloc()` 和 `realloc()` 分配内存
+
+```
+#include <stdlib.h>
+
+void *calloc(size_t numitems, size_t size);
+```
+
+- `numitems` 指定分配对象的数量，`size` 指定每个对象的大小
+- 分配成功返回这块内存起始处的指针，无法分配时返回 `NULL`
+- `calloc()` 会将已分配的内存初始化为 0
+
+```
+#include <stdlib.h>
+
+void *realloc(void *ptr, size_t size);
+```
+
+- `realloc()` 用来调整(通常是增加)一块内存的大小，此块内存应该是之前由 `malloc`  包中函数所分配的
+
+- `ptr` 是指向需要调整大小的内存块的指针，`size` 指定所需调整大小的期望值
+
+- 成功时 `realloc()` 返回指向大小调整后内存块的指针，与调用之前的指针相比，两者可能不同，如果发生错误，`realloc()` 返回 `NULL`，对 `ptr` 指针指向的内存块则保持不变
+
+- `realloc()`  不会对额外分配的字节进行初始化
+
+- 调用 `realloc(ptr,0)` 等效于 `free(ptr)` 之后再调用 `malloc(0)`，调用 `realloc(NULL,size)` 相当于调用  `malloc(size)`
+
+- 通常情况下，当增大已分配内存时：
+
+  - `realloc()` 会试图去合并在空闲列表中紧跟其后其大小满足要求的内存块
+  - 如果不存在，并且原内存块位于堆的顶部，那么 `realloc()` 将会对堆空间进行扩展，如果原来的内存块在堆的中部，且紧邻其后的空间不足，`realloc()` 会分配一块新的内存，并且将原有的数据复制到新的内存，这种形式更为常见，会占用大量的 CPU 资源
+
+- 由于 `realloc()` 可能会移动内存，对这块内存的后续引用就必须使用 `realloc()` 返回的指针
+- 一般应该尽量避免使用 `realloc()`
+
+
+### 分配对齐的内存
 
 
 
