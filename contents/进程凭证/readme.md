@@ -233,7 +233,26 @@ int getgroups(int size, gid_t list[]);
 - `getgroups` 获取调用进程所属组的集合
 - 调用程序需要负责为 `list` 数组分配存储空间，并在 `size` 参数中指定其长度
 - 调用成功返回置于 `list`  中组 ID 数量
-- 如果进程属组的数量超过了 `size`  则错误返回，设置 `errno` 为 `EINVAL`
+- 如果进程属组的数量超过了 `size`  则错误返回，设置 `errno` 为 `EINVAL`，为避免此种情况，可将 `list` 的大小调整为 `NGROUPS_MAX+1`(定义在 `<limits.h>`)
+- 可以将 `list` 的参数指定为 0，此时 `list` 未做修改，但调用的返回值却给了进程属组的数量
+
+```
+       #include <sys/types.h>
+       #include <unistd.h>
+
+       int getgroups(int size, gid_t list[]);
+
+       #include <grp.h>
+
+       int setgroups(size_t size, const gid_t *list);
+
+   Feature Test Macro Requirements for glibc (see feature_test_macros(7)):
+
+       setgroups(): _BSD_SOURCE
+
+```
+
+
 
 
 
