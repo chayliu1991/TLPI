@@ -199,7 +199,7 @@ int getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid);
 - `getresgid()` 的规则与 `getresuid()` 类似
 - `getresgid()` 和 `getresuid()` 调用具有 0/1 效应，即对 ID 的修改请求，要么全成功，要么全失败
 
-# 获取和修改文件系统 ID
+## 获取和修改文件系统 ID
 
 上述所有修改进程有效用户 ID 或组 ID 的系统调用总是会修改相应的文件系统 ID，要想独立于有效 ID 而修改文件系统ID：
 
@@ -237,24 +237,30 @@ int getgroups(int size, gid_t list[]);
 - 可以将 `list` 的参数指定为 0，此时 `list` 未做修改，但调用的返回值却给了进程属组的数量
 
 ```
-       #include <sys/types.h>
-       #include <unistd.h>
+#define _BSD_SOURCE
+#include <sys/types.h>
+#include <unistd.h>
+#include <grp.h>
 
-       int getgroups(int size, gid_t list[]);
-
-       #include <grp.h>
-
-       int setgroups(size_t size, const gid_t *list);
-
-   Feature Test Macro Requirements for glibc (see feature_test_macros(7)):
-
-       setgroups(): _BSD_SOURCE
-
+int setgroups(size_t size, const gid_t *list);
+int initgroups(const char *user, gid_t group);
 ```
 
+- `setgroups()` 用 `list` 数组指定的集合来替换调用进程的辅助组 ID，`size` 指定了置于参数 `list` 数组中的组 ID 数量
+- `initgroups()` 将扫马路 `/etc/groups`  文件，为 user 创建属组列表，以此来初始化调用进程的辅助组 ID，也会将参数 `group` 指定的组 ID 追加到进程辅助组 ID 的集合中
+- `initgroups()` 主要用话是创建登录会话的程序，例如 `login` ，在用户调用登录 shell 之前，为进程设置各种属性。这类程序一般通过读取密码文件中用户记录的组属性来获取参数 `group`  的值
 
+## 修改进程凭证的系统调用总结
 
+![](./img/certificate.png)
 
+修改进程凭证的接口比较：
+
+![](./img/certificate_comp.png)
+
+- 针对特权级进程和非特权级进程调用 `setreuid()` 和 `setregid()`  的情况，若 r 的值不等于 -1 或者 e 的值有别于函数调用前的实际 ID，则将保存 Set-user-ID 或保存 Set-group-ID 设置为新的有效 ID
+- 只要修改了有效用户(组) ID，就会将 Linux 特有的文件系统用户(组) ID 也修改为相同值
+- 不管有效用户 ID 是否改变，`setresuid()` 总是把文件系统用户 ID 修改为有效用户 ID，`setresgid()` 系统调用对文件系统组 ID 的效力与之类似
 
 
 
