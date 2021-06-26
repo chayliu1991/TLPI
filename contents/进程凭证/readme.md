@@ -210,6 +210,31 @@ int setfsuid(uid_t fsuid);
 int setfsgid(uid_t fsgid);
 ```
 
+- `setfsuid()` 将进程文件系统用户 ID 修改为指定的值，`setfsgid()` 将文件系统组 ID 修改为指定的值
+
+- `setfsuid()` 的规则：
+  - 非特权进程能够将文件系统用户 ID 设置为实际用户 ID、有效用户 ID、文件系统用户 ID(即保持不变)或保存 Set-user-ID 的当前值
+  - 特权级进程能够将文件系统用户 ID 设置为任意值
+- `setfsgid()` 的规则与 `setfsuid()` 类似
+
+- 瑕疵：
+  - 没有相应的系统调用来获取当前文件系统的 ID
+  - 这些系统调用也不做错误检查，无论这些调用成功与否，其返回值总是之前相关文件系统的 ID
+
+## 获取和修改辅助组 ID
+
+```
+#include <sys/types.h>
+#include <unistd.h>
+
+int getgroups(int size, gid_t list[]);
+```
+
+- `getgroups` 获取调用进程所属组的集合
+- 调用程序需要负责为 `list` 数组分配存储空间，并在 `size` 参数中指定其长度
+- 调用成功返回置于 `list`  中组 ID 数量
+- 如果进程属组的数量超过了 `size`  则错误返回，设置 `errno` 为 `EINVAL`
+
 
 
 

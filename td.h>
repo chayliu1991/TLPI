@@ -1,0 +1,83 @@
+GETGROUPS(2)                                                                                                Linux Programmer's Manual                                                                                                GETGROUPS(2)
+
+NNAAMMEE
+       getgroups, setgroups - get/set list of supplementary group IDs
+
+SSYYNNOOPPSSIISS
+       ##iinncclluuddee <<ssyyss//ttyyppeess..hh>>
+       ##iinncclluuddee <<uunniissttdd..hh>>
+
+       iinntt ggeettggrroouuppss((iinntt _s_i_z_e,, ggiidd__tt _l_i_s_t[[]]));;
+
+       ##iinncclluuddee <<ggrrpp..hh>>
+
+       iinntt sseettggrroouuppss((ssiizzee__tt _s_i_z_e,, ccoonnsstt ggiidd__tt **_l_i_s_t));;
+
+   Feature Test Macro Requirements for glibc (see ffeeaattuurree__tteesstt__mmaaccrrooss(7)):
+
+       sseettggrroouuppss(): _BSD_SOURCE
+
+DDEESSCCRRIIPPTTIIOONN
+       ggeettggrroouuppss()  returns  the supplementary group IDs of the calling process in _l_i_s_t.  The argument _s_i_z_e should be set to the maximum number of items that can be stored in the buffer pointed to by _l_i_s_t.  If the calling process is a member
+       of more than _s_i_z_e supplementary groups, then an error results.  It is unspecified whether the effective group ID of the calling process is included in the returned list.  (Thus, an application should also call ggeetteeggiidd(2)  and  add  or
+       remove the resulting value.)
+
+       If  _s_i_z_e  is  zero,  _l_i_s_t is not modified, but the total number of supplementary group IDs for the process is returned.  This allows the caller to determine the size of a dynamically allocated _l_i_s_t to be used in a further call to ggeett‐‐
+       ggrroouuppss().
+
+       sseettggrroouuppss() sets the supplementary group IDs for the calling process.  Appropriate privileges (Linux: the CCAAPP__SSEETTGGIIDD capability) are required.  The _s_i_z_e argument specifies the number of supplementary group IDs in the buffer pointed to
+       by _l_i_s_t.
+
+RREETTUURRNN VVAALLUUEE
+       On success, ggeettggrroouuppss() returns the number of supplementary group IDs.  On error, -1 is returned, and _e_r_r_n_o is set appropriately.
+
+       On success, sseettggrroouuppss() returns 0.  On error, -1 is returned, and _e_r_r_n_o is set appropriately.
+
+EERRRROORRSS
+       EEFFAAUULLTT _l_i_s_t has an invalid address.
+
+       ggeettggrroouuppss() can additionally fail with the following error:
+
+       EEIINNVVAALL _s_i_z_e is less than the number of supplementary group IDs, but is not zero.
+
+       sseettggrroouuppss() can additionally fail with the following errors:
+
+       EEIINNVVAALL _s_i_z_e is greater than NNGGRROOUUPPSS__MMAAXX (32 before Linux 2.6.4; 65536 since Linux 2.6.4).
+
+       EENNOOMMEEMM Out of memory.
+
+       EEPPEERRMM  The calling process has insufficient privilege (it does not have the CCAAPP__SSEETTGGIIDD capability).
+
+       EEPPEERRMM (since Linux 3.19)
+              The use of sseettggrroouuppss() is denied in this user namespace.  See the description of _/_p_r_o_c_/_[_p_i_d_]_/_s_e_t_g_r_o_u_p_s in uusseerr__nnaammeessppaacceess(7).
+
+CCOONNFFOORRMMIINNGG TTOO
+       SVr4, 4.3BSD.  The ggeettggrroouuppss() function is in POSIX.1-2001 and POSIX.1-2008.  Since sseettggrroouuppss() requires privilege, it is not covered by POSIX.1.
+
+NNOOTTEESS
+       A process can have up to NNGGRROOUUPPSS__MMAAXX supplementary group IDs in addition to the effective group ID.  The constant NNGGRROOUUPPSS__MMAAXX is defined in _<_l_i_m_i_t_s_._h_>.  The set of supplementary group IDs is inherited from the parent process, and pre‐
+       served across an eexxeeccvvee(2).
+
+       The maximum number of supplementary group IDs can be found at run time using ssyyssccoonnff(3):
+
+           long ngroups_max;
+           ngroups_max = sysconf(_SC_NGROUPS_MAX);
+
+       The maximum return value of ggeettggrroouuppss() cannot be larger than one more than this value.  Since Linux 2.6.4, the maximum number of supplementary  group  IDs  is  also  exposed  via  the  Linux-specific  read-only  file,  _/_p_r_o_c_/_s_y_s_/_k_e_r_‐
+       _n_e_l_/_n_g_r_o_u_p_s___m_a_x.
+
+       The  original  Linux  ggeettggrroouuppss()  system call supported only 16-bit group IDs.  Subsequently, Linux 2.4 added ggeettggrroouuppss3322(), supporting 32-bit IDs.  The glibc ggeettggrroouuppss() wrapper function transparently deals with the variation across
+       kernel versions.
+
+   CC lliibbrraarryy//kkeerrnneell ddiiffffeerreenncceess
+       At the kernel level, user IDs and group IDs are a per-thread attribute.  However, POSIX requires that all threads in a process share the same credentials.  The NPTL threading implementation handles the POSIX requirements by  providing
+       wrapper  functions for the various system calls that change process UIDs and GIDs.  These wrapper functions (including the one for sseettggrroouuppss()) employ a signal-based technique to ensure that when one thread changes credentials, all of
+       the other threads in the process also change their credentials.  For details, see nnppttll(7).
+
+SSEEEE AALLSSOO
+       ggeettggiidd(2), sseettggiidd(2), ggeettggrroouupplliisstt(3), ggrroouupp__mmeemmbbeerr(3), iinniittggrroouuppss(3), ccaappaabbiilliittiieess(7), ccrreeddeennttiiaallss(7)
+
+CCOOLLOOPPHHOONN
+       This page is part of release 4.04 of the Linux _m_a_n_-_p_a_g_e_s project.  A description of the project, information about reporting bugs, and the latest version of this page, can be found at http://www.kernel.org/doc/man-pages/.
+
+Linux                                                                                                               2015-07-23                                                                                                       GETGROUPS(2)
