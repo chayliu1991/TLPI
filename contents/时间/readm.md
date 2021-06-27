@@ -326,7 +326,9 @@ clock_t times(struct tms *buf);
 clock_t clock(void);
 ```
 
-
+- `clock()` 提供了一个简单的接口用于获取进程时间，返回一个值描述了调用进程使用的总得的 CPU 时间(包括用户和系统时间)
+- `clock()` 返回值得计量单位是 `CLOCK_PER_SEC` ，所以必须除以这个值来获得进程使用的 CPU 时间秒数，`CLOCK_PER_SEC` 通常是 1000
+- 
 
  
 
