@@ -133,6 +133,14 @@ int uname(struct utsname *buf);
 
 - 在 Linux 中这些字段的长度都是 65，其中包括了空字节终止符所占用的空间
 - `sysname`，`release`，`version`，`machine` 字段由内核自动设置
+- `/proc/version` 中也包含了这些信息
+
+- `nodenmae` 字段的返回值由 `sethostname()`  系统调用设置，`gethostname()` 则为反向操作，用于获取系统的主机名
+- `domainname` 字段的返回值由 `setdomainname()`  系统调用设置，`getdomainname()` 为反向操作，获取 NIS 域名
+
+
+
+
 
 
 
