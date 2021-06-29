@@ -289,13 +289,125 @@ LD_LIBRARY_PATH=. ./prog
 ```
 mv libdemo.so.1.0.1 /usr/lib
 cd /usr/lib
-ln -s libdemo.so.1.0.1 libdemo.so.1
-ln -s libdemo.so.1 libdemo.so
+ln -s libdemo.so.1.0.1 libdemo.so.1 # 创建 soname 
+ln -s libdemo.so.1 libdemo.so	# 创建链接器名称
 ```
 
+## ldconfig
+
+ `ldconfig` 解决了共享库的两个潜在问题：
+
+- 共享库可以位于各种目录中，如果动态链接器需要通过搜索这些目录来找一个库并加载这个库，整个过程将非常慢
+- 当安装了新版本的库或者删除了旧版本的库，那么  `soname` 符号链接就不是最新的
+
+ `ldconfig` 可以通过执行两个任务来解决这些问题：
+
+- 它搜索一组标准的目录并创建或更新一个缓存文件 `/etc/ld.so.cache` 使之包含在所有这些目录中的主要版本(每个库的主要版本的最新的次要版本)列表，动态链接器在运行时解析库名称时会轮流使用这个缓存文件：
+  - 为了构建这个缓存，`ldconfig` 会搜索在 `/etc/ld.so.conf` 中指定的目录，然后搜索 `/lib` 和 `/usr/lib`
+  - ``/etc/ld.so.conf` 文件由一个目录路径名（应该是绝对路径名）列表构成，其中路径名之间用换行、空格、制表符、逗号或冒号分隔
+  - 在一些发行版中， `/usr/local/lib` 目录也位于这个列表中
+  - `ldconfig -p` 会显示 `/etc/ls.so.cache` 的当前内容
+- 它检查每个库的各个主要版本的最新次要版本以找出嵌入的 `soname`，然后在同一目录中为每个 `soname` 创建（或更新）相对符号链接：
+  - 为了能够正确执行这些动作，`ldconfig` 要求库的名称要根据前面介绍的规范来命名：库的真实名称包含主要和次要标识符，它们随着库的版本的更新而恰当的增长
+  - 可以使用命令行选项来指定它执行其中一个动作： `-N` 选项会防止缓存的重建，` -X ` 选项会阻止 `soname` 符号链接的创建。 此外， `-v `(verbose)
+    选项会使得 `ldconfig` 输出描述其所执行的动作的信息
+
+每当安装了一个新的库，更新或者删除一个既有库，以及 `/etc/ld.so.conf` 中的目录列表被修改后，都运行相应的 `ldconfig`。
+
+安装一个库的两个不同主要版本：
+
+```
+mv libdemo.so.1.0.1 libdemo.so.2.0.0 /usr/lib
+```
+
+为链接器名称创建符号链接：
+
+```
+ln -s libdemo.so.2 libdemo.so
+```
+
+如果更新库的一个次要版本，由于链接器名称指向了最新的 `soname`，因此 `ldconfig` 还能取得保持链接器名称的最新效果：
+
+```
+mv libdemo.so.2.0.1 /usr/lib
+```
+
+如果使用的是私有库，即没有安装在上述的标准目录中的库，那么可以使用 `-n` 选项让 `ldconfig` 创建 `soname` ，这个选项指定了只处理在命令行中列出的目录的库，无需更新缓存文件。
+
+使用 `ldconfig` 来处理当前工作目录中的库：
+
+```
+gcc -g -c -fPIC -Wall mod1.c mod2.c mod3.c
+gcc -g -c -shared -Wl,-soname,libdemo.so.1 -o libdemo.so.1.0.1 mod1.o mod2.o mod3.o
+/sbin/ldconfig -nv .
+```
+
+# 兼容与不兼容库比较
+
+满足下列条件时表示修改过的库与既有版本兼容：
+
+- 库中所有公共方法和变量的语义保持不变
+- 没有删除库的公共 API 中的函数和变量，但向公共 API 中添加新函数和变量
+- 每个函数分配的结构以及没和函数的返回结构保持不变
+
+如果这些条件都满足，更新库时只需要调增既有库的次要版本号，否则就要创建新的主版本。
+
+# 升级共享库
+
+共享库的优点之一就是当一个运行着的程序正在使用共享库的一个既有版本时，也能够安装新的主要版本或者次要版本的库，需要做的是：
+
+- 创建新的库版本，将其安装到恰当的目录
+- 根据需要更新 `soname` 和链接器名称符号链接，或者使用 `ldconfig` 完成这部分工作
+
+更新次要版本：
+
+```
+gcc -g -c -fPIC -Wall mod1.c mod2.c mod3.c
+gcc -g -c -shared -Wl,-soname,libdemo.so.1 -o libdemo.so.1.0.2 mod1.o mod2.o mod3.o
+mv libdemo.so.1.0.2 /usr/lib
+ldconfig -v | grep libdemo
+```
+
+更新主要版本：
+
+```
+gcc -g -c -fPIC -Wall mod1.c mod2.c mod3.c
+gcc -g -c -shared -Wl,-soname,libdemo.so.2 -o libdemo.so.2.0.0 mod1.o mod2.o mod3.o
+mv libdemo.so.2.0.0 /usr/lib
+ldconfig -v | grep libdemo
+cd /usr/lib
+ln -sf libdemo.so.2 libdemo.so
+```
+
+# 在目标文件中指定库搜索目录
+
+通知动态链接器共享库的位置的方式：
+
+- `LD_LIBRARY_PATH` 环境变量中指定
+- 将共享库安装到标准库目录：`/lib`，`/usr/lib`，`/etc/ls.so.conf` 中列出的其中一个目录
+
+第三种方式：在静态编辑阶段可以在执行文件中插入一个在运行时搜索共享库的目录列表，这种方式对于库位于一个固定的但不属于动态链接器搜索标准位置时非常有用，在创建文件时需要增加 `-rpath` 链接器选项。
+
+```
+gcc -g -Wall,-rpath,/home/mtk/pdir -o prog prog.c libdemo.so
+```
+
+将字符串 `/home/mtk/pdir` 复制到可执行 文件 `prog` 的运行时库路径列表中，在程序运行时，动态链接器在解析共享库引用时还会搜索这个路径。
+
+指定多个目录：
+
+- 多次指定 `-rpath` 选项，所有这些列出的目录会被链接成一个放到可执行文件中的有序 `-rpath`  列表
+- 在一个 `-rpath` 选项中可以指定多个由分号分隔开的目录列表，运行时，动态链接器会按照 `-rpath` 选项中指定的目录顺序来搜索目录
+
+`-rpath` 的一个可替代方案就是使用 `LD_RUN_PARH` 环境变量，可以将由一个逗号分隔开的目录的字符串赋值给该变量，只有当构建可执行文件时没有指定 `-rpath` 选项才会使用 `LD_RUN_PATH`
+
+## 在构建贡献库时使用 `-rpath` 链接器选项
+
+假设有一个库依赖于另一个共享库 `lib2.so`
 
 
- 
+
+
 
 
 
