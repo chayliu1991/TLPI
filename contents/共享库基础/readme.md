@@ -403,7 +403,157 @@ gcc -g -Wall,-rpath,/home/mtk/pdir -o prog prog.c libdemo.so
 
 ## 在构建贡献库时使用 `-rpath` 链接器选项
 
-假设有一个库依赖于另一个共享库 `lib2.so`
+假设有一个库 `lib1.so` 依赖于另一个共享库 `lib2.so` ，另外再假设这些库分别位于非标准目录 `d1` 和 `d2`中：
+
+![](./img/lib_dependency.png)
+
+首先在 `pdir/d2` 目录中构建 `libx2.so`，这里省略了库的版本号和 `soanme`：
+
+```
+cd  /home/mtk/pdir/d2
+gcc -g -c -fPIC -Wall modx2.c
+gcc -g -shared -o libx2.so modx2.o
+```
+
+接着在 `pdir/d1` 目录中构建 `libx1.so`。由于 `libx1.so` 依赖于 `lib2.so`，并且 `libx2.so` 位于一个非标准目录中，因此在指定 `libx2.so` 的运行时位置时需要使用 `-rpath` 链接器选项。这个选项的取值与库的链接时位置可以不同：
+
+```
+cd /home/mtk/pdir/d1
+gcc -g -c -Wall modx1.c
+gcc -g -shared -o libx1.so modx1.o -Wl,-rpath,/home/mtk/pdir/d2 -L/home/mtk/pdir/d2 -lx2
+```
+
+ `pdir` 目录中构建主程序，由于主程序使用了  `libx1.so` 并且这个库位于一个非标准目录中，因此还需要使用 `-rpath` 链接器选项：
+
+```
+cd /home/mtk/pdir
+gcc -g -Wall -o prog prog.c -Wl,-rpath,/home/mtk/pdir/d1 -L/home/mtk/pdir/d1 -lx1
+```
+
+在链接主程序是，无需指定 `libx2.so`，由于链接器能够分析 `libx1.so` 中的 `rpath` 列表，因此它能够找到 `libx2.so`，同时在静态链接阶段解析出所有的符号。
+
+可以通过 `readelf --dynamic` 或者等价的 `readelf -d` 命令的输出来查看 `rpath` 列表。
+
+## `ELF DT_RPATH` 和 `DT_RUNPATH` 条目
+
+第一版 ELF 规范中，只有一种 `rpath` 列表能够被嵌入到可执行文件或共享库中，对应  ELF  文件中的 `DT_RPATH` 标签。后续的 ELF 舍弃了 `DT_RPATH` ，同时引入 `DT_RUNPATH` 来表示 `rpath` 列表，两者的差别在于动态链接器在运行时搜索共享库时它们相对于 `LD_LIBRARY_PATH` 环境变量的优先级，`DT_RPATH` 的优先级更高，`DT_RUNPATH` 的优先级更低。
+
+默认情况下，链接器将 `rpath` 列表创建为 `DT_RPATH` 标签。为了让链接器将 `rpath` 列表创建为 `DT_RUNPATH` 条目必须使用 `--enable-new-dtags`。
+
+## 在 `rpath` 中使用 `$ORIGIN`
+
+应用程序中使用了自身的共享库，但同时不希望强制要求将这些库安装在其中一个标准目录中，可以在构建链接器的时候，增加 `$ORIGIN`，动态链接器将这个字符串解释成 "包含应用程序的目录"：
+
+```
+gcc -Wl,-rpath,'ORIGIN'/lib ...
+```
+
+# 在运行时找出共享库
+
+在解析库依赖时，动态链接器首先会检查各个依赖字符串以确定它是否包含 `/`，如果找到了一个斜线，那么依赖字符串就会被解释成一个路径名，并且会使用该路径名加载库，否则动态链接器会使用下面的规则来搜索共享库：
+
+- 如果可执行文件的 `DT_RPATH` 运行时库路径列表中包含目录并且不包含 `DT_RUNPATH` 列表，那么就搜索这些目录，按照链接程序时指定的目录顺序
+- 如果定义了 `LD_LIBRARY_PATH` 环境变量，那么就会轮流搜索该变量值中以冒号分隔的各个目录，如果可执行文件是一个 set-user-ID 或者 set-group-ID 程序，那么就会忽略 `LD_LIBRARY_PATH` 变量。这项安全措施就是为了防止用户欺骗动态链接器让其加载一个与可执行文件所属的库的名称一样的私有库
+- 如果可执行文件 `DT_RUNPATH` 运行时库路径列表中包含目录，那么就搜索这些目录，按照链接程序时指定的目录顺序
+- 检查 `/etc/ld.so.cache` 文件以确认它是否包含了与库相关的条目
+- 搜索 `/lib` 和 `/usr/lib` 目录
+
+# 运行时符号解析
+
+假设现在有一个主程序和一个共享库，它们两个都定义了一个全局函数 `xyz()`，并且共享库中的另一个函数调用了 `xyz()`：
+
+![](./img/global_symbols.png)
+
+```
+gcc -g -c -fPIC -Wall -c foo.c
+gcc -g -shared -o libfoo.so foo.o
+gcc -g -o prog prog.c libfoo.so
+LD_LIBRARY_PATH=.
+./prog
+```
+
+- 主程序中的 `xyz()` 定义将覆盖共享库中的定义
+- 如果一个全局符号在多个库中进行了定义，那么对该符号的引用会绑定在扫描库时找到的第一个定义，扫描顺序是按照这些库在静态链接命令行中列出时从左到右的顺序
+
+如果想使用共享库中的  `xyz()` 调用，需要指定 `-Bsymbolic`  链接器选项：
+
+```
+gcc -g -c -fPIC -Wall -c foo.c
+gcc -g -shared -Wl,-Bsymbolic -o libfoo.so foo.o
+gcc -g -o prog prog.c libfoo.so
+LD_LIBRARY_PATH=.
+./prog
+```
+
+ `-Bsymbolic`  链接器选项指定了共享库中对全局符号的应用应该优先绑定到库中的相应定义(如果存在)。
+
+# 使用静态库取代共享库
+
+默认情况下，当链接器能够选择名称一样的共享库和静态库时，会优先使用共享库：
+
+```
+-Lsomedir -ldemo
+```
+
+并且 `libdemo.so` 和 `libdemo.a` 都存在的话，会优先使用 `libdemo.a`。
+
+如果要强制使用静态库：
+
+- 在 gcc 命令中指定静态库的路径名，包括  `.a`  扩展
+- 在 gcc 命令行中指定 `-static` 选项
+- 使用 `-Wl,-Bstatic` 和 `-Wl,Bdynamic` gcc 选项来显示指定链接到静态库还是动态库
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
