@@ -150,10 +150,10 @@ LD_LIBRARY_PATH=. ./prog # 告知动态链接器在当前工作目录中搜索�
 
 ```
  gcc -g -c -fPIC -Wall mod1.c mod2.c mod3.c
- gcc -g -shared -W1,-soname,libbar.so -o libfoo.so mod1.o mod2.o mod3.o
+ gcc -g -shared -Wl,-soname,libbar.so -o libfoo.so mod1.o mod2.o mod3.o
 ```
 
-- `-W1,-soname,libbar.so` 等选项都是传给链接器的指令，以将共享库 `libfoo.so` 的 `soname` 设置为 `libbar.so`
+- `-Wl,-soname,libbar.so` 等选项都是传给链接器的指令，以将共享库 `libfoo.so` 的 `soname` 设置为 `libbar.so`
 
 使用一下命令中的任意一个，可以确定既有共享库的 `soname`：
 
@@ -177,11 +177,125 @@ gcc -g -Wall -o prog prog.c libfoo.so
 
 ![](./img/soname.png)
 
+程序载入内存以设备执行时发生的事情：
+
+![](./img/soname_load.png)
+
+要找出一个进程当前使用的共享库则可以列出相应的 Linux 特有的 `/proc/PID/maps` 文件中的内容。  
+
+# 使用共享库的有用工具
+
+## ldd
+
+`ldd`  ： 列出动态依赖，显示一个程序运行时所需要的共享库。
+
+`ldd`  会解析出每个库引用，使用的搜索方式与动态链接器一样，并以下面的形式显示结果：
+
+```
+library-name => resolves-to-path
+```
+
+对于多数的 ELF 文件，`ldd` 至少会列出与 `ld-linux.so.2`、动态链接器以及标准 C 库 `lib.so.6` 相关的条目。
+
+## objdump 和 readelf
+
+`objdump`  ：用来从可执行文件、编译过的目标、以及共享库中获取各类信息，包括反汇编的二进制机器码，还可以用来显示这些文件各个 ELF 节的头部信息，当这样使用时，它就类似于 `readelf`，`readelf` 能显示类似的信息，但是格式不同。
+
+## nm 
+
+`nm` 命令会列出目标库或可执行文件中定义的一组符号，常用来寻找哪些库定义了一个符号。
+
+# 共享库版本和命名规则
+
+命名形式：
+
+```
+libname.so major-id.minor-id
+```
+
+- `major-id` ：主要版本标识符，区分两个不兼容的版本
+- `minor-id` ：次要版本可以是任意字符串，但是通常的形式是两个由点分隔的数字，第一个数字表示次要版本，第二个数字表示该次要版本的补丁号或者修订号
+
+ ```
+ libdemo.so.1.0.1
+ libdemo.so.1.0.2
+ libdemo.so.2.0.0
+ ```
+
+共享库的 `soname` 包括相应的主版本标识符，但是不包含次要版本标识符，因此  `soname` 的命名形式为：
+
+```
+libname.so.major-id
+```
+
+通常，会将 `soname`  创建为包含真实名称的目录的一个相对符号链接：
+
+```
+libdemo.so.1      ->  libdemo.so.1.0.2
+libdemo.so.2      ->  libdemo.so.2.0.0
+```
+
+共享库的一个主要版本可能有多个不同的次要版本，通常每个库的主要版本的  `soname`  会指向主要版本中最新的次要版本，由于静态链接阶段会将 `soname`  的副本(独立于次要版本)嵌入到可执行文件中，并且 `soname` 符号链接后面可能会被修改为指向更新的次要版本，从而确保在执行期间能够加载库的最新的次要版本。
+
+同一个库的不同主要版本也能够同时存在，被需要它们的程序分别访问。
+
+除了真实名称和 `soname` 之外，通常还会为每个共享库定义第三个名称：链接器名称，将可执行文件与共享库链接起来时会使用这个名称，链接器名称是一个只包含库名称不包含主要版本和次要版本标识符的符号链接，其形式为 `libname.so`，有了链接器名称之后就可以构建能够自动使用共享库最新版本的链接命令。
+
+链接器名称一般与它所引用的文件位于同一个目录中，它既可以链接到真实名称，也可以链接到库的最新主要版本的 `soname`。通常最好使用指向 `soname`  的链接，从而对 `soname` 的修改会自动反应到链接器名称。
+
+如果需要使用一个旧版本的共享库，就不能使用链接器名称，要使用真实名称或者 `soname` 来指示出需要的版本。
+
+![](./img/libname.png)
+
+## 使用标准规范创建一个共享库
+
+- 创建目标文件
+
+```
+gcc -g -c -fPIC -Wall mod1.c mod2.c mod3.c
+```
+
+- 创建共享库，指定真实名称和 `soname`
+
+```
+gcc -g -shared -Wl,-soname,libdemo.so.1 -o libdemo.so.1.0.1 mod1.o mod2.o mod3.o
+```
+
+- 为 `soname` 和链接器名称创建恰当的符号链接
+
+```
+ln -s libdemo.so.1.0.1 libdemo.so.1
+ln -s libdemo.so.1 libdemo.so
+```
+
+-  使用链接器名称构建可执行文件
+
+```
+gcc -g -Wall -o prog prog.c -L. -ldemo
+LD_LIBRARY_PATH=. ./prog
+```
+
+# 安装共享库
+
+共享库及其关联的符号链接一般会被安装到一个标准目录中，标准目录包括：
+
+- `/usr/lib` ：是大多数标准库安装的目录
+- `/lib` ：应该将系统启动时用到的库安装到这个目录，因为系统启动时可能还没有挂载 `/usr/lib`
+- `/usr/local/lib` ：应该将非标准或者实验性质的库安装到这个目录
+- `/etc/ld.so.conf` 中列出的目录
+
+安装完成后一般需要创建 `soname`  和链接器名称的符号链接：
+
+```
+mv libdemo.so.1.0.1 /usr/lib
+cd /usr/lib
+ln -s libdemo.so.1.0.1 libdemo.so.1
+ln -s libdemo.so.1 libdemo.so
+```
 
 
 
-
-
+ 
 
 
 
