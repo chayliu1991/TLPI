@@ -137,9 +137,180 @@ void __attribute__((visibility("hidden"))) func(void)
 
 # 链接器版本脚本
 
+版本脚本是一个包含链接器 `ld` 执行指令的文本文件，要使用版本脚本必须指定 `--version-script` 链接器选项：
 
+```
+gcc -Wl,--version-script,myscript.map ...
+```
 
+## 使用版本脚本控制符号的可见性
 
+假设 `vis_comm.c` 中定义 `vis_comm()`, `vis_f1.c` 中定义 `vis_f1()`, `vis_f2.c` 中定义 `vis_f2()`, `vis_comm()` 由 `vis_f1()` 和 `vis_f2.c` 调用，但是不想让链接库的程序直接使用。
+
+可以使用版本脚本：
+
+```
+# vis.map
+
+VER_1{
+	global:
+		vis_f1;
+		vis_f2;
+	local:
+		*;
+};
+```
+
+- `VER_1` 是一种版本标签，如果使用版本脚本只是为了控制符号的可见性，那么版本标签是多余的，但老版本的 `ld` 仍然需要使用这个标签，现代版本的 `ld` 允许省略版本标签，如果省略了版本标签，就认为版本节点拥有一个匿名版本标签并且在这个脚本中不能存在其他版本节点
+- `global` 标记出对库之外的程序可见的符号列表的起始位置，`local` 标记出对库之外的程序隐藏的符号列表的起始位置
+
+```
+gcc -g -c -fPIC -Wall vis_comm.c vis_f1.c vis_f2.c
+gcc -g -c -shared -o vis.so vis_common.o vis_f1.o vis_f2.o -Wl,--version-script,vis.map
+```
+
+## 符号版本化
+
+符号版本化允许一个共享库提供同一个函数的多个版本，每个程序会使用它与共享库进行静态链接时函数的当前版本。
+
+```
+# sv_lib_v1.c
+
+#include <stdio.h>
+void xyz(void){printf("v1,xyz\n");}
+
+# sv_v1.map
+VER_1{
+	global:xyz;
+	local:*;
+};
+```
+
+```
+gcc -g -c -fPIC -Wall sv_lib_v1.c
+gcc -g -shared -o libsv.so sv_lib_v1.o -Wl,--version-script,sv_v1.map
+```
+
+假设现在需要修改 `xyz()` 的定义，但是原来已经使用 `xyz()` 的程序要仍旧使用老版本，必须在库中定义两个版本的  `xyz()` ：
+
+```
+# sv_lib_v1.c
+
+#include <stdio.h>
+
+__asm__(".symver xyz_old,xyz@VER_1");
+__asm__(".symver xyz_new,xyz@@VER_2"); //@@ 指示应用程序与这个共享库静态链接时应该使用的 xyz() 默认定义
+
+void xyz_old(void){printf("v1,xyz\n");}
+void xyz_new(void){printf("v2,xyz\n");}
+void pqr(void){printf("v2 pqr\n");}
+```
+
+```
+# sv_v2.map
+
+VER_1{
+	global:xyz;
+	local:*;
+};
+
+VER_2{
+	global:pqr;
+}VER_1;
+```
+
+- `VER_2` 依赖于 `VER_1` ,版本依赖可以继承 `local` 和 `global` 规范；依赖可以串联起来
+- `VER_2` 中 `global` 中指定了 `pqr()`,如果不这样，将从 `VER_1` 继承而来的规范将导致 `pqr()` 对外不可见  
+
+```
+gcc -g -c -fPIC -Wall sv_lib_v2.c
+gcc -g -shared -o libsv.so sv_lib_v2.o -Wl,--version-script,sv_v2.map
+```
+
+# 初始化和终止函数
+
+可以定义一个或多个在共享库被加载和卸载时自动执行的函数。
+
+初始化和终止函数是使用 gcc 的 `constructor` 和 `destructor` 特性来定义，在库被加载时需要执行的所有函数应该定义成下面的形式：
+
+```
+void __attribute__((constructor)) some_name_load(void)
+{
+}
+```
+
+卸载函数的形式：
+
+```
+void __sttribute__((destructor)) some_name_unload(void)
+{
+}
+```
+
+- `constructor` 和 `destructor`  也能创建主程序的初始化函数和终止函数
+
+## `_init()` 和 `_fini()`
+
+完成共享库的初始化和终止工作的较早的技术是在库中创建两个函数 `_init()` 和 `_fini()` 函数。
+
+如果创建了 `_init()` 和 `_fini()` 函数，构建库时必须指定 `gcc -nostartfiles` 选项以防止链接器加入这些函数的默认实现，如果需要的话，可以施用 `-Wl,-init` 和 `-Wl,-fini` 选项指定函数的名称。
+
+有了 `gcc` 的 `constructor` 和  `destructor` 特性后，不建议使用 `_init()` 和  `_fini()`。
+
+# 预加载共享库
+
+环境变量 `LD_PRELOAD` 包含了在加载其他共享库之前需要加载的共享库名称，共享库名称之间使用空格和冒号分隔。由于首先会加载这些库，因此可执行文件自动会使用这些库中定义的函数，从而覆盖那些动态链接器在其他情况下搜索的同名函数。
+
+出于安全的原因，在 `set-user-ID` 和 `set-setgroup-ID` 程序中将会忽略 `LD_PRELOAD`。
+
+# 监控动态链接器
+
+将环境变量 `LD_DEBUG`  设置为一个或多个标准关键词可以从动态链接器中得到各种跟踪信息：
+
+如果将 `help` 赋给 `LD_DEBUG`，那么动态链接器会输出有关 `LD_DEBUG` 的帮助信息，而指定的命令不会被执行。
+
+```
+LD_DEBUG=help date
+Valid options for the LD_DEBUG environment variable are:
+
+  libs        display library search paths
+  reloc       display relocation processing
+  files       display progress for input file
+  symbols     display symbol table processing
+  bindings    display information about symbol binding
+  versions    display version dependencies
+  scopes      display scope information
+  all         all previous options combined
+  statistics  display relocation statistics
+  unused      determined unused DSOs
+  help        display this help message and exit
+```
+
+要将调试信息输出到一个文件中而不是标准输出中，则可以使用 `LD_DEBUG_OUTPUT` 环境变量指定一个文件名。
+
+当请求与跟踪库搜索相关的信息时会产生很多输出：
+
+```
+LD_DEBUG=libs date
+     29623:     find library=libc.so.6 [0]; searching
+     29623:      search cache=/etc/ld.so.cache
+     29623:       trying file=/lib/x86_64-linux-gnu/libc.so.6
+     29623:
+     29623:
+     29623:     calling init: /lib/x86_64-linux-gnu/libc.so.6
+     29623:
+     29623:
+     29623:     initialize program: date
+     29623:
+     29623:
+     29623:     transferring control: date
+     29623:
+```
+
+- `29623` 是跟踪的进程的进程 ID
+- 如果需要的话可以给 `LD_DEBUG` 赋多个选项，各个选项之间用逗号分隔(不能出现空格)，
+- `LD_DEBUG` 对于由动态链接器隐式加载的库和使用 `dlopen()` 动态加载的库都有效
+- 出于安全的原因，在 `set-user-ID` 和 `set-setgroup-ID` 程序中将会忽略 `LD_DEBUG`
 
 
 
