@@ -94,7 +94,18 @@ tag-type:[tag-qualifier]:permissions
 
 # ACL 在实现方面的限制
 
+各类文件系统都对一 ACL 中所包含记录的条数有所限制：
 
+- 冗长的 ACL 将增加维护工作的复杂程序，且容易出错
+- 扫描 ACL 寻找匹配记录所需的时间，将随记录条数的增长而增长
+
+# ACL API
+
+使用 ACL API 需要与 `libacl` 库链接，即编译时需要指定 `-lacl` 选项。
+
+## 概述
+
+![](./img/acl_lib.png)_
 
 
 
