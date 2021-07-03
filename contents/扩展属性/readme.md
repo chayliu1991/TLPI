@@ -107,6 +107,10 @@ ssize_t llistxattr(const char* pathname,char* list,size_t size);
 ssize_t flistxattr(cint fd,char* list,size_t size);
 ```
 
+- 将 EA 的名称列表以一系列以空字符结尾的字符串形式置于 `list`  所指向的缓冲区中，缓冲区的大小由  `size` 指定
+- 成功时，返回复制到 `list` 中的字节数
+- 可将 `size` 指定为0，系统调用将忽略 `list`，并返回后续调用实际获取 EA 名称列表时所需的缓冲区大小
+
 
 
 
