@@ -107,6 +107,144 @@ tag-type:[tag-qualifier]:permissions
 
 ![](./img/acl_lib.png)_
 
+## 将文件的 ACL 读入内存
+
+ `acl_get_entry()` 返回一个句柄，指向内存 ACL 中的记录之一，句柄的返回位置由函数的最后一个参数指定：
+
+```
+acl_entry_t entry;
+status = acl_get_entry(acl,entry_id,&entry);
+```
+
+- `entry_id` 参数决定了返回哪条记录的句柄：
+  - `ACL_FIRST_ENTRY` ：返回的句柄指向 ACL 中的首条 ACE
+  - `ACL_NEXT_ENTRY`：返回的句柄将指向上次获取记录之后的 ACE
+- 成功获取一条 ACE， 返回 1，若无记录可取，则返回 0，失败返回 -1
+
+## 获取并修改 ACL 记录中的属性
+
+`acl_get_tag_type()` 和 `acl_set_tag_type()`  可分别用来获取和修改 ACL 记录中的标记类型：
+
+```
+acl_tag_t tag_type;
+
+status = acl_get_tag_type(entry,&tag_type);
+status = acl_set_tag_type(entry,&tag_type);
+```
+
+- `tag_type` 的取值可以是 `ACL_USER_OBJ`， `ACL_USER`， `ACL_GROUP_OBJ`， `ACL_GROUP`， `ACL_USER_OBJ`， `ACL_OTHER`， `ACL_MASK`
+
+`acl_set_qualifier` 和 `acl_get_qualifier` 可以分别用来获取和修改 ACL 记录中的标记限定符：
+
+```
+uid_t* qualp;
+
+qualp = acl_get_qualifier(entry);
+qualp = acl_set_qualifier(entry,qualp);
+```
+
+- 仅当 ACE 的标记类型为 `ACL_USER` 或者 `ACL_GROUP` 时，标记限定符才有意义
+
+`acl_get_permset()` 和  `acl_set_permset()` 可分别用来获取和修改 ACE 中的权限集合：
+
+```
+acl_permset permset;
+
+status = acl_get_permset(entry,&permset);
+status = acl_set_permset(entry,permset);
+```
+
+下列函数用来操纵某一权限集合中的内容：
+
+```
+int is_set;
+
+is_set = acl_get_perm(permset,perm);
+status = acl_add_perm(permset,perm);
+status = acl_delete_perm(permset,perm);
+status = acl_clear_perm(permset);
+```
+
+- `perm` 可以指定为 `ACL_READ`，`ACL_WRITE`，`ACL_EXECUTE`
+- 若在权限集合中成功激活由 `perm`  参数指定的权限，`acl_get_perm()` 将返回1，否则返回0
+- `acl_add_perm()` 用来向由 `permse` 参数所指定的权限集合中追加由 `perm` 参数指定的权限
+- `acl_delete_perm()` 用来从 `permse` 参数所指代的权限集合中删除 `perm` 参数所指定的权限
+- `acl_clear_perm()` 用来从 `permse` 参数所指代的权限集合中删除所有权限
+
+## 创建和删除 ACE
+
+`acl_create_entry()`  用来在现有 ACL 中新建一条记录，该函数会将一个指代新建 ACE 的句柄返回到由其第二个参数所指定的内存位置：
+
+```
+acl_entry_t entry;
+
+status = acl_create_entry(&acl,&entry);
+```
+
+删除这一条 ACE 记录：
+
+```
+status = acl_delete_entry(acl,entry);
+```
+
+ ## 更新文件的 ACL
+
+`acl_set_file()` 的作用与 `acl_get_file()` 相反，将使用驻留于内存的 ACL  内容来更新磁盘上的 ACL：
+
+```
+int status;
+status = acl_set_file(pathname,type,acl);
+```
+
+如想更新访问型 ACL，则需将该函数的 `type`  参数指定为 `ACL_TYPE_ACCESS`；如果想要更新目录的默认型 ACL，则需将 `type` 指定为 `ACL_TYPE_DEFAULT`。
+
+## ACL 在内存和文本格式之间的转换
+
+`acl_from_text()` 可将包含文本格式的 ACL 的字符串转换为内存 ACL，并返回一个句柄，用以在后续函数调用中指代该 ACL：
+
+```
+acl = acl_from_text(acl_string);
+```
+
+`acl_to_text()` 则执行相反的转换，并同时返回对应于 ACL 的长文本格式字符串：
+
+```
+char* str;
+ssize_t len;
+
+str = acl_to_text(acl,&len);
+```
+
+## ACL API 中的其他函数
+
+`acl_calc_mask(&acl)` 函数用来计算并设置内存 ACL 中的 `ACL_MASK` 型记录的权限。只要是修改或创建 ACL，就会用到该函数。
+
+若参数 `acl`  所指定的 ACL 有效，`acl_valid(acl)` 函数将返回 0，否则返回 -1。
+
+若以下所有条件成立，则可判定该 ACL 有效：
+
+- `ACL_USER_OBJ`，`ACL_GROUP_OBJ`，`ACL_OTHER` 类型的记录都只能有一条
+- 若有任一 `ACL_USER` 或者 `ACL_GROUP` 类型的记录存在，则必然存在一条 `ACL_MASK` 记录
+- 标记类型为 `ACL_MASK`   的  ACE 至多有一条
+- 每条标记类型为 `ACL_USER` 的记录都有唯一的用户 ID
+- 每条标记类型为 `ACL_GROUP` 的记录都有唯一的组 ID
+
+`acl_delete_def_file`  用来删除目录的默认型 ACL。
+
+`acl_init(count)` 用来创建一个空的 ACL 结构，其空间足以容纳由参数 `count` 指定的记录数。
+
+`acl_dup(acl)`  用来为由 `acl` 参数所指定的  ACL 创建副本，并以该 ACL 副本的句柄作为返回值。
+
+`acl_free(handle)` 用来释放由其他 ACL 函数所分配的内存。
+
+
+
+
+
+
+
+
+
 
 
 
