@@ -1,0 +1,122 @@
+UNLINK(2)                                                                                                   Linux Programmer's Manual                                                                                                   UNLINK(2)
+
+NNAAMMEE
+       unlink, unlinkat - delete a name and possibly the file it refers to
+
+SSYYNNOOPPSSIISS
+       ##iinncclluuddee <<uunniissttdd..hh>>
+
+       iinntt uunnlliinnkk((ccoonnsstt cchhaarr **_p_a_t_h_n_a_m_e));;
+
+       ##iinncclluuddee <<ffccnnttll..hh>>           /* Definition of AT_* constants */
+       ##iinncclluuddee <<uunniissttdd..hh>>
+
+       iinntt uunnlliinnkkaatt((iinntt _d_i_r_f_d,, ccoonnsstt cchhaarr **_p_a_t_h_n_a_m_e,, iinntt _f_l_a_g_s));;
+
+   Feature Test Macro Requirements for glibc (see ffeeaattuurree__tteesstt__mmaaccrrooss(7)):
+
+       uunnlliinnkkaatt():
+           Since glibc 2.10:
+               _XOPEN_SOURCE >= 700 || _POSIX_C_SOURCE >= 200809L
+           Before glibc 2.10:
+               _ATFILE_SOURCE
+
+DDEESSCCRRIIPPTTIIOONN
+       uunnlliinnkk() deletes a name from the filesystem.  If that name was the last link to a file and no processes have the file open, the file is deleted and the space it was using is made available for reuse.
+
+       If the name was the last link to a file but any processes still have the file open, the file will remain in existence until the last file descriptor referring to it is closed.
+
+       If the name referred to a symbolic link, the link is removed.
+
+       If the name referred to a socket, FIFO, or device, the name for it is removed but processes which have the object open may continue to use it.
+
+   uunnlliinnkkaatt(())
+       The uunnlliinnkkaatt() system call operates in exactly the same way as either uunnlliinnkk() or rrmmddiirr(2) (depending on whether or not _f_l_a_g_s includes the AATT__RREEMMOOVVEEDDIIRR flag) except for the differences described here.
+
+       If  the  pathname  given  in  _p_a_t_h_n_a_m_e is relative, then it is interpreted relative to the directory referred to by the file descriptor _d_i_r_f_d (rather than relative to the current working directory of the calling process, as is done by
+       uunnlliinnkk() and rrmmddiirr(2) for a relative pathname).
+
+       If the pathname given in _p_a_t_h_n_a_m_e is relative and _d_i_r_f_d is the special value AATT__FFDDCCWWDD, then _p_a_t_h_n_a_m_e is interpreted relative to the current working directory of the calling process (like uunnlliinnkk() and rrmmddiirr(2)).
+
+       If the pathname given in _p_a_t_h_n_a_m_e is absolute, then _d_i_r_f_d is ignored.
+
+       _f_l_a_g_s is a bit mask that can either be specified as 0, or by ORing together flag values that control the operation of uunnlliinnkkaatt().  Currently only one such flag is defined:
+
+       AATT__RREEMMOOVVEEDDIIRR
+              By default, uunnlliinnkkaatt() performs the equivalent of uunnlliinnkk() on _p_a_t_h_n_a_m_e.  If the AATT__RREEMMOOVVEEDDIIRR flag is specified, then performs the equivalent of rrmmddiirr(2) on _p_a_t_h_n_a_m_e.
+
+       See ooppeennaatt(2) for an explanation of the need for uunnlliinnkkaatt().
+
+RREETTUURRNN VVAALLUUEE
+       On success, zero is returned.  On error, -1 is returned, and _e_r_r_n_o is set appropriately.
+
+EERRRROORRSS
+       EEAACCCCEESS Write access to the directory containing _p_a_t_h_n_a_m_e is not allowed for the process's effective UID, or one of the directories in _p_a_t_h_n_a_m_e did not allow search permission.  (See also ppaatthh__rreessoolluuttiioonn(7).)
+
+       EEBBUUSSYY  The file _p_a_t_h_n_a_m_e cannot be unlinked because it is being used by the system or another process; for example, it is a mount point or the NFS client software created it to represent an active but otherwise  nameless  inode  ("NFS
+              silly renamed").
+
+       EEFFAAUULLTT _p_a_t_h_n_a_m_e points outside your accessible address space.
+
+       EEIIOO    An I/O error occurred.
+
+       EEIISSDDIIRR _p_a_t_h_n_a_m_e refers to a directory.  (This is the non-POSIX value returned by Linux since 2.1.132.)
+
+       EELLOOOOPP  Too many symbolic links were encountered in translating _p_a_t_h_n_a_m_e.
+
+       EENNAAMMEETTOOOOLLOONNGG
+              _p_a_t_h_n_a_m_e was too long.
+
+       EENNOOEENNTT A component in _p_a_t_h_n_a_m_e does not exist or is a dangling symbolic link, or _p_a_t_h_n_a_m_e is empty.
+
+       EENNOOMMEEMM Insufficient kernel memory was available.
+
+       EENNOOTTDDIIRR
+              A component used as a directory in _p_a_t_h_n_a_m_e is not, in fact, a directory.
+
+       EEPPEERRMM  The  system  does  not allow unlinking of directories, or unlinking of directories requires privileges that the calling process doesn't have.  (This is the POSIX prescribed error return; as noted above, Linux returns EEIISSDDIIRR for
+              this case.)
+
+       EEPPEERRMM (Linux only)
+              The filesystem does not allow unlinking of files.
+
+       EEPPEERRMM or EEAACCCCEESS
+              The directory containing _p_a_t_h_n_a_m_e has the sticky bit (SS__IISSVVTTXX) set and the process's effective UID is neither the UID of the file to be deleted nor that of the directory containing it, and the process is not privileged  (Linux:
+              does not have the CCAAPP__FFOOWWNNEERR capability).
+
+       EERROOFFSS  _p_a_t_h_n_a_m_e refers to a file on a read-only filesystem.
+
+       The same errors that occur for uunnlliinnkk() and rrmmddiirr(2) can also occur for uunnlliinnkkaatt().  The following additional errors can occur for uunnlliinnkkaatt():
+
+       EEBBAADDFF  _d_i_r_f_d is not a valid file descriptor.
+
+       EEIINNVVAALL An invalid flag value was specified in _f_l_a_g_s.
+
+       EEIISSDDIIRR _p_a_t_h_n_a_m_e refers to a directory, and AATT__RREEMMOOVVEEDDIIRR was not specified in _f_l_a_g_s.
+
+       EENNOOTTDDIIRR
+              _p_a_t_h_n_a_m_e is relative and _d_i_r_f_d is a file descriptor referring to a file other than a directory.
+
+VVEERRSSIIOONNSS
+       uunnlliinnkkaatt() was added to Linux in kernel 2.6.16; library support was added to glibc in version 2.4.
+
+CCOONNFFOORRMMIINNGG TTOO
+       uunnlliinnkk(): SVr4, 4.3BSD, POSIX.1-2001, POSIX.1-2008.
+
+       uunnlliinnkkaatt(): POSIX.1-2008.
+
+NNOOTTEESS
+   GGlliibbcc nnootteess
+       On  older  kernels  where  uunnlliinnkkaatt()  is  unavailable,  the  glibc  wrapper  function  falls  back  to the use of uunnlliinnkk(2) or rrmmddiirr(2).  When _p_a_t_h_n_a_m_e is a relative pathname, glibc constructs a pathname based on the symbolic link in
+       _/_p_r_o_c_/_s_e_l_f_/_f_d that corresponds to the _d_i_r_f_d argument.
+
+BBUUGGSS
+       Infelicities in the protocol underlying NFS can cause the unexpected disappearance of files which are still being used.
+
+SSEEEE AALLSSOO
+       rrmm(1), cchhmmoodd(2), lliinnkk(2), mmkknnoodd(2), ooppeenn(2), rreennaammee(2), rrmmddiirr(2), mmkkffiiffoo(3), rreemmoovvee(3), ppaatthh__rreessoolluuttiioonn(7), ssyymmlliinnkk(7)
+
+CCOOLLOOPPHHOONN
+       This page is part of release 4.04 of the Linux _m_a_n_-_p_a_g_e_s project.  A description of the project, information about reporting bugs, and the latest version of this page, can be found at http://www.kernel.org/doc/man-pages/.
+
+Linux                                                                                                               2014-08-19                                                                                                          UNLINK(2)
