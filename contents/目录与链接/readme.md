@@ -345,7 +345,38 @@ int fchdir(int fd);
 int chroot(const char *path);
 ```
 
+- `chroot()` 只能由特权级进程调用
 
+# 解析路径名
+
+```
+#include <limits.h>
+#include <stdlib.h>
+
+char *realpath(const char *path, char *resolved_path);
+```
+
+- `realpath()` 对 `path` 中的所有符号链接一一解除引用，并解析其中所有对 `./` 和 `../`  的引用，从而生成一个以空字符结尾的字符串，内含相应的绝对路径
+-  `resolved_path` 中放置解析后的字符串，该字符数组最小长度为  `PATH_MAX` 个字节
+- 调用成功，返回指向 `resolved_path` 的指针
+
+# 解析路径名字符串
+
+```
+#include <libgen.h>
+
+char *dirname(char *path);
+char *basename(char *path);
+```
+
+- 给定 `/home/britta/prog.c`，`dirname()` 返回 `/home/britta`，`basename` 返回 `prog.c`
+- 注意：
+  - 将忽略 `path`  尾部的斜线字符
+  - 如果 `path` 未包含斜线字符，那么 `dirname()` 将返回 `.`，而 `basename()` 将返回 `path`
+  - 如果 `path` 仅由一个 `/` 组成，那么 `dirname()` 和 `basename()`  都将返回 `/`
+  - 如果 `path` 为空指针或者空字符串，那么 `dirname()` 和 `basename()`  都将返回 `.`
+
+![](./img/dirname_basename.png)
 
 
 
