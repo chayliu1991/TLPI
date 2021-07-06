@@ -1,4 +1,4 @@
-#define _OPEN_SOURCE 600
+#define _XOPEN_SOURCE 600
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -28,9 +28,9 @@ static void usageError(const char* progname,const char* msg)
 }
 
 
-static int dirTree(const char* pathname,const struct* sbuf,int type,struct FTW* ftwb)
+static int dirTree(const char* pathname,const struct stat* sbuf,int type,struct FTW* ftwb)
 {
-    switch(sbuf->sd_mode & S_IFMT)
+    switch(sbuf->st_mode & S_IFMT)
     {
         case S_IFREG: printf("-");break;
         case S_IFDIR: printf("d");break;

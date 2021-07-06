@@ -1,5 +1,5 @@
 CC = gcc
-Targets = unlink list_files nftw
+Targets = unlink list_files nftw view_symlink
 
 all : $(Targets)
 
@@ -12,7 +12,8 @@ list_files :
 nftw : 
 	$(CC) $(CFLAGS) -o nftw nftw.c
 
-
+view_symlink : 
+	$(CC) $(CFLAGS) -o view_symlink view_symlink.c
 
 clean:
 	-rm -rf $(Targets)
