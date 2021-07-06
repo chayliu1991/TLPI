@@ -295,7 +295,55 @@ int nftw(const char* dirpath,int(*func)(const char* pathname,const struct stat* 
   - `FTW_SKIP_SUBTREE` ：如果 `pathname` 是目录，那么就不对该目录下的条目调用 `func`，恢复进行对该目录的下一个同级目录的处理
   - `FTW_STOP` ：与传统 `func`  返回非 0 值时一样，不再进一步处理目录树下的任何条目
 
+# 进程的当前工作目录
 
+## 获取当前工作目录
+
+```
+#include <unistd.h>
+
+char *getcwd(char *buf, size_t size);
+```
+
+- `getcwd()` 将当前工作目录的绝对路径的字符串置于 `buf` 指向的已分配缓冲区，必须为 `buf` 分配至少 `size` 个字节的空间
+- 调用成功返回指向 `buf` 的指针，如果当前工作目录路径名称长度大于 `size`  个字节，则返回 `NULL`，设置错误 `ERANGE`
+
+## 改变当前工作目录
+
+```
+#include <unistd.h>
+
+int chdir(const char *path);
+```
+
+- 将调用进程的当前工作目录改为 `path` 指定的目录
+- `path`  可以是绝对路径，也可以是相对路径，如果是符号链接，还会对其解引用
+
+```
+#define _XOPEN_SOURCE 500
+#include <unistd.h>
+
+int fchdir(int fd);
+```
+
+- 指定目录时使用打开文件描述符
+
+# 针对目录文件描述符的相关操作
+
+系统调用使用目录文件描述来解释相对路径：
+
+![](./img/fd_path.png)
+
+# 改变进程的根目录
+
+每个进程都有一个根目录，该目录是解释绝对路径时的起点，默认是文件系统的真实根目录。
+
+```
+#define _BSD_SOURCE
+#include <unistd.h>
+
+int chroot(const char *path);
+```
 
 
 
