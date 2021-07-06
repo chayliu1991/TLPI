@@ -378,7 +378,8 @@ char *basename(char *path);
 
 ![](./img/dirname_basename.png)
 
-
+- `dirname()` 和 `basename()`  都可以修改 `path` 指向的字符串，因此如果希望保留原有路径字符串，则应该传递副本
+- `dirname()` 和 `basename()`  所返回的指针都可指向静态分配的字符串，对相同函数的后续调用可能会修改这些字符串的内容
 
 
 
