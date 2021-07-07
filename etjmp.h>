@@ -1,0 +1,57 @@
+SETJMP(3)                                                                                                   Linux Programmer's Manual                                                                                                   SETJMP(3)
+
+NNAAMMEE
+       setjmp, sigsetjmp - save stack context for nonlocal goto
+
+SSYYNNOOPPSSIISS
+       ##iinncclluuddee <<sseettjjmmpp..hh>>
+
+       iinntt sseettjjmmpp((jjmmpp__bbuuff _e_n_v));;
+
+       iinntt ssiiggsseettjjmmpp((ssiiggjjmmpp__bbuuff _e_n_v,, iinntt _s_a_v_e_s_i_g_s));;
+
+   Feature Test Macro Requirements for glibc (see ffeeaattuurree__tteesstt__mmaaccrrooss(7)):
+
+       sseettjjmmpp(): see NOTES.
+       ssiiggsseettjjmmpp(): _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_C_SOURCE
+
+DDEESSCCRRIIPPTTIIOONN
+       sseettjjmmpp() and lloonnggjjmmpp(3) are useful for dealing with errors and interrupts encountered in a low-level subroutine of a program.  sseettjjmmpp() saves the stack context/environment in _e_n_v for later use by lloonnggjjmmpp(3).  The stack context will be
+       invalidated if the function which called sseettjjmmpp() returns.
+
+       ssiiggsseettjjmmpp() is similar to sseettjjmmpp().  If, and only if, _s_a_v_e_s_i_g_s is nonzero, the process's current signal mask is saved in _e_n_v and will be restored if a ssiigglloonnggjjmmpp(3) is later performed with this _e_n_v.
+
+RREETTUURRNN VVAALLUUEE
+       sseettjjmmpp() and ssiiggsseettjjmmpp() return 0 if returning directly, and nonzero when returning from lloonnggjjmmpp(3) or ssiigglloonnggjjmmpp(3) using the saved context.
+
+AATTTTRRIIBBUUTTEESS
+       For an explanation of the terms used in this section, see aattttrriibbuutteess(7).
+
+       ┌──────────────────────┬───────────────┬─────────┐
+       │IInntteerrffaaccee             │ AAttttrriibbuuttee     │ VVaalluuee   │
+       ├──────────────────────┼───────────────┼─────────┤
+       │sseettjjmmpp(), ssiiggsseettjjmmpp() │ Thread safety │ MT-Safe │
+       └──────────────────────┴───────────────┴─────────┘
+
+CCOONNFFOORRMMIINNGG TTOO
+       sseettjjmmpp(): POSIX.1-2001, POSIX.1-2008, C89, C99.
+
+       ssiiggsseettjjmmpp(): POSIX.1-2001, POSIX.1-2008.
+
+NNOOTTEESS
+       POSIX does not specify whether sseettjjmmpp() will save the signal mask (to be later restored during lloonnggjjmmpp(3)).  In System V it will not.  In 4.3BSD it will, and there is a function __sseettjjmmpp that will not.  On  Linux  with  glibc  versions
+       before  2.19,  sseettjjmmpp()  follows  the  System  V behavior by default, but the BSD behavior is provided if the __BBSSDD__SSOOUURRCCEE feature test macro is defined and none of __PPOOSSIIXX__SSOOUURRCCEE, __PPOOSSIIXX__CC__SSOOUURRCCEE, __XXOOPPEENN__SSOOUURRCCEE, __XXOOPPEENN__SSOOUURRCCEE__EEXXTTEENNDDEEDD,
+       __GGNNUU__SSOOUURRCCEE, or __SSVVIIDD__SSOOUURRCCEE is defined.  Since glibc 2.19, _<_s_e_t_j_m_p_._h_> exposes only the System V version of sseettjjmmpp().  Programs that need the BSD semantics should replace calls to sseettjjmmpp() with calls  to  ssiiggsseettjjmmpp()  with  a  nonzero
+       _s_a_v_e_s_i_g_s argument.
+
+       If you want to portably save and restore signal masks, use ssiiggsseettjjmmpp() and ssiigglloonnggjjmmpp(3).
+
+       sseettjjmmpp() and ssiiggsseettjjmmpp() make programs hard to understand and maintain.  If possible, an alternative should be used.
+
+SSEEEE AALLSSOO
+       lloonnggjjmmpp(3), ssiigglloonnggjjmmpp(3)
+
+CCOOLLOOPPHHOONN
+       This page is part of release 4.04 of the Linux _m_a_n_-_p_a_g_e_s project.  A description of the project, information about reporting bugs, and the latest version of this page, can be found at http://www.kernel.org/doc/man-pages/.
+
+                                                                                                                    2015-08-08                                                                                                          SETJMP(3)
