@@ -124,6 +124,213 @@ int kill(pid_t pid, int sig);
 
 ![](./img/send_signal_authority.png)
 
+- 如果进程无权发送信号给所请求的 `pid`，那么 `kill()` 调用将失败，且设置 `errno` 为 `EPERM`。若 `pid` 所指为一系列进程时，只要向其中之一发送信号，则 `kill()` 调用成功
+
+# 检查进程的存在
+
+若将 `sig`  指定为0，即发送所谓的空信号，则无信号发送，利用这种方法可以检查特定进程 ID 的进程是否存在：
+
+- 如果发送失败，且 `errno` 为 `ESRCH`，则表明目标进程不存在
+- 如果调用失败，且 `errno` 为 `EPERM`，则表明进程存在，但实际无权向目标进程发送信号
+- 如果调用成功，那么表示进程存在
+
+特定进程 ID 的存在，不能保证指定的程序正在运行：
+
+- 内核会随着进程的生灭而循环使用进程 ID
+- 特定进程可能存在，但是一个僵尸进程，即进程已死，但其父进程尚未执行 `wait()` 来获取其终止状态
+
+检查某一个进程是否正在运行：
+
+- `wait()` ：监控调用者的子进程
+- 信号量和排他文件锁：如果进程持续持有某一信号量或文件锁，并且一直处于被监控状态，那么如能获取到信号量或锁时，表明进程已经终止
+- 管道和 FIFO 的 IPC 通道：可对监控目标进程进行设置I，令其在自身生命周期内持有对通道进行写操作的打开文件描述符，令监控进程持有针对通道进行读操作的打开文件描述符，当通道写入端关闭时，即可获知监控目标进程已终止
+- `/proc/PID`：如果进程存在，则特定的 `/proc/PID`  将存在，但是由于循环使用进程ID，同一进程 ID 可能指代的是不同的程序
+
+# 发送信号的其他方式
+
+```
+#include <signal.h>
+
+int raise(int sig);
+```
+
+- `raise()` 使得进程向自身发送信号
+- 单线程程序，调用 `raise()`  相当于： `kill(getpid(),sig)`
+- 支持线程的系统将 `raise()` 实现为：`pthread_kill(pthread_self(),sig)`
+- 当进程使用 `raise()` 或者  `kill()` 向自身发送信号时，信号将立即传递，即在返回调用之前
+- `raise()` 出错将返回非0值，唯一失败的原因是 `EINVAL`，即 `sig` 无效
+
+```
+#include <signal.h>
+
+int killpg(int pgrp, int sig);
+```
+
+- `pgrp()` 向某一个进程组发送一个信号，相当于 `kill(-pgrp,sig)`
+- 如果 `pgrp == 0`，则将向调用者所属进程组的所有进程发送信号
+
+# 显示信号描述
+
+```
+#define _BSD_SOURCE
+#include <signal.h>
+
+extern const char * const sys_siglist[];
+
+#define _GNU_SOURCE
+#include <string.h>
+
+char *strsignal(int sig);
+```
+
+- `strsignal()` 对 `sig` 进行边界检查，返回一个指针，指向该信号的可打印描述字符串，或者当参数无效时，返回指向错误的字符串
+
+```
+#include <signal.h>
+
+void psignal(int sig, const char *msg);
+```
+
+- `psignal()` 在标准错误设备上展示 `msg`  给定的字符串，后面跟一个冒号，随后是对 `sig` 信号的描述
+
+# 信号集
+
+多个信号可以使用一个称为信号集的数据结构来描述，数据类型为 `sigset_t`。
+
+```
+#include <signal.h>
+
+int sigemptyset(sigset_t *set);
+int sigfillset(sigset_t *set);
+```
+
+- `sigemptyset()` 初始化一个未包含任何成员的信号集
+- `sigfillset()` 初始化一个信号集，使其包含所有信号，包含所有实时信号
+- 必须使用 `sigemptyset()` 或者 `sigfillset()` 初始化信号集
+
+```
+#include <signal.h>
+
+int sigaddset(sigset_t *set, int signum);
+int sigdelset(sigset_t *set, int signum);
+```
+
+- `sigaddset()` 向信号集中添加信号
+- `sigdelset()` 从信号集中删除信号
+
+```
+#include <signal.h>
+
+int sigismember(const sigset_t *set, int signum);
+```
+
+- `sigismember()` 用来测试信号 `sig`  是否是信号集 `set` 的成员，如果是，返回1，如果不是，返回 0
+
+```
+#define _GNU_SOURCE
+#include <signal.h>
+
+int sigisemptyset(const sigset_t *set);
+int sigorset(sigset_t *dest, const sigset_t *left,const sigset_t *right);
+int sigandset(sigset_t *dest, const sigset_t *left,const sigset_t *right);
+```
+
+- `sigandset()` 将 `left` 集和 `right`  集的交集置于  `dest`
+- `sigandset()` 将 `left` 集和 `right`  集的并集置于  `dest`
+- 若 `set` 集内未包含信号，则 `sigisemptyset()` 返回 `true`
+
+# 信号掩码
+
+内核会为每一个进程维护一个信号掩码，即一组信号，并将阻塞其针对该进程的传递，直到其被从进程信号掩码中移除。
+
+信号掩码实际上是线程属性，在多线程进程中，每个线程都可以使用 `pthread_sigmask()` 函数来独立检查和修改其信号掩码。
+
+向信号掩码中添加一个信号：
+
+- 当调用信号处理器程序时，可将引发调用的信号自动添加到信号掩码中，是否发生这一情况，要视 `sigaction()`  函数在安装信号处理器程序时所使用的标志而定
+- 使用 `sigaction()` 函数建立信号处理器程序时，可以指定一组额外信号，当调用该处理器程序时会将其阻塞
+- 使用 `sigprocmask()` 函数可以随时向信号掩码中添加或者移除信号
+
+```
+#include <signal.h>
+
+int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
+```
+
+- `how` 指定了 `sigprocmask`  想给掩码带来的变化：
+  - `SIG_BLOCK`：将 `set`指向信号集内的指定信号添加到信号掩码中，换言之，将信号掩码设置为其当前值和 `set` 的并集
+  - `SIG_UNBLOCK`：将 `set` 指向信号集的信号从信号掩码中移除，即使要解除阻塞的信号当前并未处于阻塞状态，也不会返回错误
+  - `SIG_SETMASK`：将 `set` 指向的信号集赋给信号掩码
+- `oldset` 不为空，则将返回之前的信号掩码
+- 如果想要获取信号掩码而又不对其改动，可以将 `set` 设置为空，此时将忽略 `how` 参数
+
+# 处于等待状态的信号
+
+如果进程接受了一个该进程正在阻塞的信号，会将该信号添加到进程的等待信号集中。之后如果解除了对该信号的锁定，会随即将信号传递给进程。
+
+```
+#include <signal.h>
+
+int sigpending(sigset_t *set);
+```
+
+- `sigpending()` 返回处于等待状态的信号集于 `set`  中
+- 如果修改了对等待信号的处置，那么当后来解除对信号的锁定时，将根据新的处置来处理信号
+
+# 不对信号进行排队处理
+
+等待信号集只是一个掩码，仅表明一个信号是否发生，而未表明其发生的次数，如果同一信号在阻塞状态下多次产生，那么会将该信号记录在等待信号集中，并在解除阻塞后只发送一次。
+
+# 改变信号处置
+
+除了 `signal()` 之外，还可以使用 `sigaction()` 设置信号处置。
+
+```
+#include <signal.h>
+
+int sigaction(int signum, const struct sigaction *act,struct sigaction *oldact);
+```
+
+- `signum`：标识想要获取或改变的信号编号，可以是 `SIGKILL` 和 `SIGSTOP` 之外的任何信号
+- `act`：描述信号新处置的数据结构，如果只对信号的现有处置感星期，可将该参数指定为 `NULL`
+- `oldact` ：返回之前信号处置的相关信息，如果不感兴趣，则可指定为 `NULL`
+- `struct sigaction`
+
+```
+struct sigaction {
+    void     (*sa_handler)(int);
+    void     (*sa_sigaction)(int, siginfo_t *, void *);
+    sigset_t   sa_mask;
+    int        sa_flags;
+    void     (*sa_restorer)(void);
+};
+```
+
+- `sa_handler`：指定信号处理器函数的地址，也可以是 `SIG_IGN` 或者  `SIG_DFL`
+- 仅当  `sa_handler` 是信号处理程序的地址时，才会对 `sa_mask` 和 `sa_flags`  字段加以处理
+- `sa_restorer` 仅供内部使用，用以确保当信号处理器程序完成后，会去调用专用的 `sigreturn()`  系统调用，借此来恢复进程的执行上下文，以便进程从信号处理器中断的位置继续执行
+- `sa_mask`：定义了一组信号，在调用由 `sa_handle` 定义的处理器程序时将阻塞该信号，当调用信号处理器程序时，会在调用信号处理器之前，将该组信号中当前未处于进程掩码之列的任何信号自动添加到进程掩码中，这些信号将保留在进程掩码中，直至信号处理器函数返回，届时将自动删除这些信号
+
+
+
+# 等待信号
+
+```
+#include <unistd.h>
+
+int pause(void);
+```
+
+
+
+
+
+
+
+
+
+
+
 
 
   

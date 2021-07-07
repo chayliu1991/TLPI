@@ -1,0 +1,50 @@
+SIGPENDING(2)                                                                                               Linux Programmer's Manual                                                                                               SIGPENDING(2)
+
+NNAAMMEE
+       sigpending, rt_sigpending - examine pending signals
+
+SSYYNNOOPPSSIISS
+       ##iinncclluuddee <<ssiiggnnaall..hh>>
+
+       iinntt ssiiggppeennddiinngg((ssiiggsseett__tt **_s_e_t));;
+
+   Feature Test Macro Requirements for glibc (see ffeeaattuurree__tteesstt__mmaaccrrooss(7)):
+
+       ssiiggppeennddiinngg(): _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE
+
+DDEESSCCRRIIPPTTIIOONN
+       ssiiggppeennddiinngg() returns the set of signals that are pending for delivery to the calling thread (i.e., the signals which have been raised while blocked).  The mask of pending signals is returned in _s_e_t.
+
+RREETTUURRNN VVAALLUUEE
+       ssiiggppeennddiinngg() returns 0 on success and -1 on error.  In the event of an error, _e_r_r_n_o is set to indicate the cause.
+
+EERRRROORRSS
+       EEFFAAUULLTT _s_e_t points to memory which is not a valid part of the process address space.
+
+CCOONNFFOORRMMIINNGG TTOO
+       POSIX.1-2001, POSIX.1-2008.
+
+NNOOTTEESS
+       See ssiiggsseettooppss(3) for details on manipulating signal sets.
+
+       If a signal is both blocked and has a disposition of "ignored", it is _n_o_t added to the mask of pending signals when generated.
+
+       The set of signals that is pending for a thread is the union of the set of signals that is pending for that thread and the set of signals that is pending for the process as a whole; see ssiiggnnaall(7).
+
+       A child created via ffoorrkk(2) initially has an empty pending signal set; the pending signal set is preserved across an eexxeeccvvee(2).
+
+   CC lliibbrraarryy//kkeerrnneell ddiiffffeerreenncceess
+       The original Linux system call was named ssiiggppeennddiinngg().  However, with the addition of real-time signals in Linux 2.2, the fixed-size, 32-bit _s_i_g_s_e_t___t argument supported by that system call was no longer fit for purpose.  Consequently,
+       a new system call, rrtt__ssiiggppeennddiinngg(), was added to support an enlarged _s_i_g_s_e_t___t type.  The new system call takes a second argument, _s_i_z_e___t _s_i_g_s_e_t_s_i_z_e, which specifies the size in bytes of the signal set in _s_e_t.  The  glibc  ssiiggppeennddiinngg()
+       wrapper function hides these details from us, transparently calling rrtt__ssiiggppeennddiinngg() when the kernel provides it.
+
+BBUUGGSS
+       In versions of glibc up to and including 2.2.1, there is a bug in the wrapper function for ssiiggppeennddiinngg() which means that information about pending real-time signals is not correctly returned.
+
+SSEEEE AALLSSOO
+       kkiillll(2), ssiiggaaccttiioonn(2), ssiiggnnaall(2), ssiiggpprrooccmmaasskk(2), ssiiggssuussppeenndd(2), ssiiggsseettooppss(3), ssiiggnnaall(7)
+
+CCOOLLOOPPHHOONN
+       This page is part of release 4.04 of the Linux _m_a_n_-_p_a_g_e_s project.  A description of the project, information about reporting bugs, and the latest version of this page, can be found at http://www.kernel.org/doc/man-pages/.
+
+Linux                                                                                                               2015-07-23                                                                                                      SIGPENDING(2)
