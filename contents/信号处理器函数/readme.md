@@ -262,7 +262,22 @@ TEMP_FAILURE_RETRY(...)
 - 操作 System V 消息队列和信号量的阻塞系统调用： `semop()`，`semtimedop()`，`msgrcv()`，`msgsnd()`
 - 对 `inotify` 文件描述符发起的 `read()` 调用
 - 用于将进程挂起指定时间的系统调用和库函数：`sleep()`，`nanosleep()`，`clock_nanosleep()`
-- 
+- 特意设计用来等待某一信号到达的系统调用：`paus()`，`sigsuspend()`，`sigtimedwait()`，`sigwaitinfo()`
+
+## 为信号修改 `SA_RESTART` 标志
+
+```
+#include <signal.h>
+
+int siginterrupt(int sig, int flag);
+```
+
+- 若 `flag` 为真，则对信号 `sig` 的处理器函数将会中断阻塞的系统调用的执行，如果 `flag` 为假，那么在执行了 `sig` 的处理器函数之后，会自动重启阻塞的系统调用
+- `siginterrupt()` 工作原理是：调用 `sigaction()` 获取信号当前处置的副本，调整自结构 `oldact` 中返回的 `SA_RESTART` 标志，接着再次调用 `sigaction()`  来更新信号的处置
+
+## 对于某些 Linux 系统调用，未处理的停止信号会产生 EINTR 错误
+
+在 Linux 上，即使没有信号处理器函数，某些阻塞的系统调用也会产生 `EINTR` 错误，如果系统调用遭到阻塞，并且进程因信号
 
 
 
