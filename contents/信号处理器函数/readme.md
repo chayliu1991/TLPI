@@ -277,7 +277,13 @@ int siginterrupt(int sig, int flag);
 
 ## 对于某些 Linux 系统调用，未处理的停止信号会产生 EINTR 错误
 
-在 Linux 上，即使没有信号处理器函数，某些阻塞的系统调用也会产生 `EINTR` 错误，如果系统调用遭到阻塞，并且进程因信号
+在 Linux 上，即使没有信号处理器函数，某些阻塞的系统调用也会产生 `EINTR` 错误，如果系统调用遭到阻塞，并且进程因信号 `SIGSTOP`，`SIGTSTP`，`SIGTTIN`，`SIGTTOU` 而停止，之后又因收到 `SIGCONT` 信号而恢复执行时，就会发生这种情况。
+
+以下系统调用和函数具有这一行为：`epoll_wait()` ， `epoll_pwait()`，对 `inotify` 文件描述符执行的 `read()` 调用，`semop()`，`semtimedop()`，`sigtimedwait()`，`sigwaitinfo()`。
+
+这种行为的结果是，如果程序可能因信号而停止和重启，那么就需要添加代码来重启这些系统调用，即便该程序并未为停止信号设置处理器函数。
+
+
 
 
 
