@@ -259,7 +259,10 @@ TEMP_FAILURE_RETRY(...)
 - IO 多路复用调用：`poll`，`epoll`，`select`，`pselect`
 - Linux 特有的 `epoll_wait()` 和 `epoll_pwait()`
 - Linux 特有的 `io_getevents()` 系统调用
-- 操作 System V 消息队列和信号量的阻塞系统调用： `semop()`，
+- 操作 System V 消息队列和信号量的阻塞系统调用： `semop()`，`semtimedop()`，`msgrcv()`，`msgsnd()`
+- 对 `inotify` 文件描述符发起的 `read()` 调用
+- 用于将进程挂起指定时间的系统调用和库函数：`sleep()`，`nanosleep()`，`clock_nanosleep()`
+- 
 
 
 
