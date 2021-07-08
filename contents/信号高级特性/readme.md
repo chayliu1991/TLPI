@@ -189,6 +189,81 @@ lim = sysconf(_SC_SIGQUEUE_MAX);
 - 要为该信号建立一个处理器函数，接收进程以 `SA_SIFINFO` 标识发起对 `sigaction()` 的调用，因此，调用信号处理器时就会附带额外的参数，其中之一就是实时信号的伴随数据
   - 在 Linux 中，即使接收进程在建立信号处理器函数时未指定 `SA_SIGINFO` 标志，也能对实时信号进行队列化管理，其他的实现则不保证
 
+## 发送实时信号
+
+```
+#define _POSIX_C_SOURCE 199309L
+#include <signal.h>
+
+int sigqueue(pid_t pid, int sig, const union sigval value);
+```
+
+- `sigqueue()` 发送信号所需要的权限与 `kill()`  的要求一致，也可以发送空信号(即 0)，其语义与 `kill()` 一致
+- 不同于 `kill()`,不能将 `pid` 指定为负值而向整个进程组发送信号
+
+```
+union sigval {
+    int   sival_int;
+    void *sival_ptr;
+};
+```
+
+-  一般较少使用 `sival_ptr`，因为指针的作用范围在进程内部，对于另一进程几乎没有意义
+
+一旦到达排队信号的数量限制，`sigqueue()`  调用将会失败，设置错误 `EAGAIN`。
+
+## 处理实时信号
+
+可以像标准信号，使用含有单一参数的常规信号处理器来处理实时信号，也可以使用带有 3 个参数的信号处理器函数来处理实时信号，其建立会使用到 `SA_SIGINFO`。
+
+```
+struct sigaction act;
+sigemptyset(&act.sa_mask);
+act.sa_sigaction = handler;
+act.sa_flags = SA_RESTART | SA_SIGINFO;
+
+if(sigaction(SIFRTMIN+5,&act,NULL) == -1)
+	errExit("sigaction");
+```
+
+# 使用掩码来等待信号
+
+对信号编程时偶尔会用到如下情况：
+
+- 临时阻塞一个信号，以防止其信号处理器不会将某些关键片段的执行中断
+- 解除对信号的阻塞，然后暂停执行，直至信号到达
+
+```
+sigset_t prevMask,intMask;
+struct sigaction sa;
+
+sigemptyset(&intMask);
+sigaddset(&intMask,SIGINT);
+
+sigemptyset(&sa.sa_mask);
+sa.sa_flags = 0;
+sa.sa_handler = handler;
+
+if(sigaction(SIGINT,&sa,NULL) == -1)
+    errExit("sigaction");
+
+//@ 阻塞 SIGINT
+if(sigprocmask(SIG_BLOCK,&intMask,&prevMAsk) == -1)  //@ 1
+     errExit("sigprocmask");
+
+//@ 做一些不会被 SIGINT 打断的工作
+
+//@ 恢复之前的处理方式
+if(sigprocmask(SIG_SETMASK,&prevMAsk,NULL) == -1) //@ 2
+     errExit("sigprocmask");
+
+pause();
+```
+
+
+
+
+
 
 
 
