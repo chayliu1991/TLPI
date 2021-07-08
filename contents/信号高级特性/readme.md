@@ -281,6 +281,21 @@ sigprocmask(SIG_SETMASK,&prevmask,NULL);
 
 - 若 `sigsuspend()` 因信号的传递而中断，则将返回 -1，并设置错误 `EINTR`，如果 `mask` 指向无效的地址，则 `sigsuspend()` 调用失败，设置错误  `EFAULT`
 
+# 以同步方式等待信号
+
+```
+#define _POSIX_C_SOURCE 199309L
+#include <signal.h>
+
+int sigwaitinfo(const sigset_t *set, siginfo_t *info);
+```
+
+- `sigwaitinfo()` 系统调用挂起进程的执行，直至 `set` 指向信号集中的某一信号抵达
+- 如果调用 `sigwaitinfo()` 时，`set` 中的某一信号已处于等待状态，那么 `sigwaitinfo()` 将立即返回，传递来的信号就此从进程的等待信号队列中移除，并且将返回信号编号作为结果
+- `info` 如果不是库，则会指向经过初始化处理的 `siginfo_t` 结构，其中所包含信息与提供给信号处理器函数的 `siginfo_t`  参数相同
+- `sigwaitinfo()` 不对标准信号排队处理，对实时信号进行排队处理，并且对实时信号的传递遵循低编号优先原则
+- 除了省去编写信号处理器的负担之外，使用 `sigwaitinfo()` 来等待信号也要比信号处理器外加 `sigsuspend()` 的组合稍快
+
 
 
 
