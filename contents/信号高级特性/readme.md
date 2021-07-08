@@ -260,6 +260,27 @@ if(sigprocmask(SIG_SETMASK,&prevMAsk,NULL) == -1) //@ 2
 pause();
 ```
 
+上述代码存在的问题，假设 `SIGINT` 信号的传递发生在第二次调用 `sigprocmask` 之后，在调用 `pause()` 之前，`SIGINT` 信号的传递将导致处理器函数的调用，而当处理器返回后，主程序恢复执行， `pause()` 将陷入阻塞，直到 `SIGINT` 信号第二次到达为止，这违背了原意：解除对 `SIGINT`  阻塞并等待第一次出现。
+
+要避免这个问题，需要将 解除信号阻塞和挂起进程这两个操作合并成一个原子操作：
+
+```
+#include <signal.h>
+
+int sigsuspend(const sigset_t *mask);
+```
+
+- `sigsuspend()` 用 `mask` 指向的信号集来替换进程的信号掩码，然后挂起进程的执行，直到其捕获到信号，并从信号处理器中返回，一旦处理器返回，`sigsuspend()` 将进程信号掩码恢复为调用前的值
+- 相当于：
+
+```
+sigprocmask(SIG_SETMASK,&mask,&prevmask);
+pause();
+sigprocmask(SIG_SETMASK,&prevmask,NULL);
+```
+
+- 若 `sigsuspend()` 因信号的传递而中断，则将返回 -1，并设置错误 `EINTR`，如果 `mask` 指向无效的地址，则 `sigsuspend()` 调用失败，设置错误  `EFAULT`
+
 
 
 
