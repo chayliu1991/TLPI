@@ -1,5 +1,5 @@
 CC = gcc
-Targets = sigqueue catch_signals sigsuspend sigwaitinfo
+Targets = sigqueue catch_signals sigsuspend sigwaitinfo signalfd
 
 all : $(Targets)
 
@@ -14,6 +14,9 @@ sigsuspend:
 
 sigwaitinfo:
 	$(CC) $(CFLAGS) -o sigwaitinfo sigwaitinfo.c
+
+signalfd:
+	$(CC) $(CFLAGS) -o signalfd signalfd.c
 
 clean:
 	-rm -rf $(Targets)
