@@ -265,7 +265,76 @@ struct sigevent {
 
 - `SIGEV_NONE`：不提供定时器的到期通知，进程可以使用 `timer_gettime()` 来监控定时器的运转情况
 - `SIGEV_SIGNAL`：定时器到期时，为进程生成指定于 `sigev_signo` 中的信号，如果 `sigev_signal` 为实时信号，那么 `sigev_value` 字段则指定了信号的伴随数据，通过 `siginfo_t` 结构的 `si_value` 可获取这一数据
-- `SIGEVTHREAD`
+- `SIGEV_THREAD`：定时器到期时，会调用由 `sigev_notify_function` 字段指定的函数，调用该函数类似于调用新线程的启动函数
+- `SIGEV_THREAD_ID`：与 `SIGEV_THREAD` 相类似，只是发送信号的目标线程 ID 要与 `sigev_notify_thread_id` 相匹配
+
+## 配备和解除定时器
+
+```
+#define _POSIX_C_SOURCE 199309L
+#include <time.h>
+
+int timer_settime(timer_t timerid, int flags,const struct itimerspec *new_value,struct itimerspec *old_value);
+```
+
+- `timer_settime()` 的参数 `timerid` 是一个定时器句柄，由之前对 `timer_create()` 的调用返回
+- `new_value` 包含定时器的新设置，`old_value` 返回定时器的前一设置，如果对前一个设置不感兴趣，可以设置为 `NULLL`
+
+```
+struct timespec {
+    time_t tv_sec;                /* Seconds */
+    long   tv_nsec;               /* Nanoseconds */
+};
+
+struct itimerspec {
+    struct timespec it_interval;  /* Timer interval */
+    struct timespec it_value;     /* Initial expiration */
+};
+```
+
+- `it_value` 指定了定时器首次到期的时间，`it_interval` 任意一个字段非0，那么就是一个周期性定时器，如果都是0，那么这个定时器将只到期一次
+- `flags` 如果是0，会将 `value.it_value` 视为始于 `timer_settime()` 调用时间点的相对值，如果 `flags` 设为 `TIMER_ABSTIME`，那么 `value.it_value` 则是一个绝对时间
+- 为了启动定时器，需要调用函数 `timer_settime()`，并将 `value.it_value` 的一个或者全部字段设置为非0，如果之前曾经配备过定时器，则 `timer_settime()` 会将之前的设置值替换掉
+- 如果定时器的值和间隔时间并非对应时钟分辨率的整数倍，那么会对这些值向上取整
+- 要解除定时器，需要调用 `timer_settime()`，并将 `value.it_value`  的所有字段设置为 0
+
+## 获取定时器的当前值
+
+```
+#define _POSIX_C_SOURCE 199309L
+#include <time.h>
+
+int timer_gettime(timer_t timerid, struct itimerspec *curr_value);
+```
+
+- `timer_gettime()` 返回由 `timerid` 指定的 POSIX 定时器的间隔以及剩余时间
+- 如果返回结构 `curr_value.it_value` 的两个字段都是0，表示定时器处于停止状态，如果 `curr_value.it_interval` 的两个字段都是0，那么该定时器仅在 `curr_value.it_value` 给定的时间到期过一次
+
+## 删除定时器
+
+每个 POSIX 定时器都会消耗少量的系统资源，一旦使用完毕，应当及时释放这些资源：
+
+```
+#define _POSIX_C_SOURCE 199309L
+#include <time.h>
+
+int timer_delete(timer_t timerid);
+```
+
+- 对于已启动的定时器，会在移除之前自动将其停止
+- 进程终止时，会自动删除所有定时器
+
+
+
+## 通过信号发出通知
+
+
+
+
+
+## 定时器溢出
+
+
 
 
 
