@@ -121,11 +121,161 @@ Linux 中需要使用 realtime，实时函数库，需要链接 `librt` 即需�
 
 ## 获取时钟的值
 
+```
+#include <time.h>
+
+int clock_getres(clockid_t clk_id, struct timespec *res);
+int clock_gettime(clockid_t clk_id, struct timespec *tp);
+```
+
+- `clock_gettime()` 针对参数 `clk_id` 所指定的时钟返回时间，返回的时间，置于 `tp` 指向的结构中
+- `clockid_t` 是 SUSv3 规范定义的数据类型，用于表示时钟标识符：
+
+![](./img/clockid_t.png)
+
+- `CLOCK_REALTIME` 时钟是一种系统级时钟，用于度量真实时间，它的设置是可以变更的
+- `CLOCK_MONOTONIC` 时钟对时间的度量始于"未予规范的过去某一时间点"，系统启动后就不会改变它，Linux 上，这种时钟对时间的测量始于系统启动
+- `CLOCK_PROCESS_CPUTIME_ID` 时钟测量调用进程所消耗的用户和系统 CPU 时间
+- `CLOCK_THREAD_CPUTIME_ID` 时钟测量调用线程所消耗的用户和系统 CPU 时间
+
+ ## 设置时钟的值
+
+```
+#define _POSIX_C_SOURCE 199309L
+#include <time.h>
+
+int clock_settime(clockid_t clk_id, const struct timespec *tp);
+```
+
+- `clock_settime()` 利用 `tp` 指向缓冲区中的时间来设置由  `clockid` 指定的时钟
+- 如果 `tp` 指向的时间并非 `clock_getres()` 所返回的时钟分辨率的整数倍，时间会向下取整
+- 特权级进程可以设置 `CLOCK_REALTIME` 时钟，该时钟的初始值通常自  Epoch 以来的时间，其他时钟类型不可更改
+
+## 获取特定进程或线程的时钟 ID
+
+要测量特定进程或线程消耗的 CPU 时间，首先要获取其时钟 ID：
+
+```
+#define _XOPEN_SOURCE 600
+#include <time.h>
+
+int clock_getcpuclockid(pid_t pid, clockid_t *clock_id);
+```
+
+- `clock_getcpuclockid`  将隶属于 `pid` 进程的 CPU 时间时钟的标识符置于 `clock_id` 指针指向的缓冲区中
+
+```
+#define _XOPEN_SOURCE 600
+#include <pthread.h>
+#include <time.h>
+
+int pthread_getcpuclockid(pthread_t thread, clockid_t *clock_id);
+```
+
+- `pthread_getcpuclockid()` 是  `clock_getcpuclockid()` 的 POSIX 线程版，返回的标识符所标识的时钟用于度量调用进程中指定线程消耗的 CPU 时间
+
+## 高分辨率休眠的改进版
+
+```
+#define _XOPEN_SOURCE 600
+#include <time.h>
+
+int clock_nanosleep(clockid_t clock_id, int flags,const struct timespec *request,struct timespec *remain);
+```
+
+- 默认情况下，`flags` 是0，`request` 指定的休眠间隔时间是相对时间，如果 `flags` 设置为 `TIMER_ABSTIME` ，`request` 则表示 `clock_id` 所测量的绝对时间，这个特性对于需要精确休眠一段指定时间的应用程序至关重要，以相对时间进行休眠，进程可能执行到一半就被占先了，结果休眠的时间要比预期的久
+
+对于那些被信号处理器中断并使用循环重启休眠的进程来说，"嗜睡" 问题尤其明显，如果以高频接收信号，那么按相对时间休眠的进程在休眠时间上会有较大误差，可以通过如下方式避免嗜睡：
+
+- 先调用 `clock_gettime()` 获取时间，再加上期望休眠的时间量
+- 再以 `TIMER_ABSTIME` 标志调用 `clock_nanosleep()` 函数，指定了 `TIME_ABSTIME` 时，不需要使用参数 `remain`
+- 信号处理器程序中断了 `clock_nanosleep()` 调用，再次调用该函数来重启休眠时，`request` 参数不变
+
+```
+struct timespec request;
+
+if(clock_gettime(CLOCK_REALTIME,&request) == -1)
+	errExit("clock_gettime");
+
+request.tv_sec += 20;  /* sleep for 20 seconds from now*/
+
+s = clock_nanosleep(CLOCK_REALTIME,TIMER_ABSTIME,&request,NULL);
+if(s != 0)
+{
+	if(s == EINTR)
+		printf("Interrupted by signal handler\n");
+	else 
+		errExit("clock_nanosleep");
+}
+```
+
+# POSIX 间隔式定时器
+
+使用 `settimer()` 来设置经典 UNIX 间隔式定时器，会收到如下制约：
+
+- 针对 `ITIMER_REAL`，`ITIMER_VIRTUAL` 和 `ITIMER_PROF` 这 3 类定时器，每种智能设置一个
+- 只能通过发送信号的方式通知定时器到期，另外也不能改变到期时产生的信号
+- 如果一个间隔式定时器到期多次，且相应信号遭到阻塞时，那么会只调用一次信号处理器函数，换言之，无从知晓是否出现定时器溢出的情况
+- 定时器的分辨率只能达到微秒级
+
+POSIX.1b 定义了一套 API 来突破这些限制，主要包含如下几个阶段：
+
+- `timer_create()` 创建一个新的定时器，并定义其到期时对进程的通知方法
+- `timer_settime()` 启动或者停止一个定时器
+- `timer_delete()` 删除不再需要使用的定时器
+
+`fork()`  创建的子进程不会继承 POSIX 定时器，调用 `exec()` 期间亦或是进程终止时将停止并删除定时器。
+
+使用 POSIX 定时器的 API 程序编译时需要使用 `-lrt`  选项。
+
+## 创建定时器
+
+```
+#define _POSIX_C_SOURCE 199309L
+#include <signal.h>
+#include <time.h>
+
+int timer_create(clockid_t clockid, struct sigevent *sevp,timer_t *timerid);
+```
+
+- `timer_create()` 创建一个新的定时器，并以 `clockid` 指定的时钟进行时间度量
+- `clockid` 可以是  SUSv3 规范定义的类型，也可以采用 `clock_getcpuclockid()`  或 `pthread_getcpuclockid()` 返回的 `clockid` 值
+- 函数返回时，`timerid` 指向的缓冲区放置定时器句柄，供后续调用中指代该定时器之用
+- `sevp` 可决定定时器到期时，对应应用程序的通知方式，指向 `struct sigevent`：
+
+```
+union sigval {          /* Data passed with notification */
+    int     sival_int;         /* Integer value */
+    void   *sival_ptr;         /* Pointer value */
+};
+
+struct sigevent {
+    int          sigev_notify; /* Notification method */
+    int          sigev_signo;  /* Notification signal */
+    union sigval sigev_value;  /* Data passed with notification */
+    void       (*sigev_notify_function) (union sigval);  /* Function used for thread notification (SIGEV_THREAD) */
+    void        *sigev_notify_attributes; 	/* Attributes for notification thread (SIGEV_THREAD) */
+    pid_t        sigev_notify_thread_id; 	/* ID of thread to signal (SIGEV_THREAD_ID) */
+};
+```
+
+- `sigev_notify` 字段的值：
+
+![](./img/sigev_notify.png)
+
+- `SIGEV_NONE`：不提供定时器的到期通知，进程可以使用 `timer_gettime()` 来监控定时器的运转情况
+- `SIGEV_SIGNAL`：定时器到期时，为进程生成指定于 `sigev_signo` 中的信号，如果 `sigev_signal` 为实时信号，那么 `sigev_value` 字段则指定了信号的伴随数据，通过 `siginfo_t` 结构的 `si_value` 可获取这一数据
+- `SIGEVTHREAD`
 
 
 
 
- 
+
+
+
+
+
+
 
 
 
