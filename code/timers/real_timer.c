@@ -28,7 +28,6 @@ static void displayTimes(const char* msg,Boolean includeTimer)
     struct timeval curr;
     static int callNum = 0;
 
-
     if(callNum == 0)
     {
         if(gettimeofday(&start,NULL) == -1)

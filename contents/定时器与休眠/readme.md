@@ -46,6 +46,72 @@ int getitimer(int which,struct itimerval* curr_value);
 
 使用 `setitimer()` 和 `alarm()` 创建的定时器可以跨越 `exec()` 调用而得以保存，但由  `fork()` 创建的子进程并不继承该定时器。
 
+## 更为简单的定时器接口：`alarm()`
+
+```
+#include <unistd.h>
+
+unsigned int alarm(unsigned int seconds);
+```
+
+- `seconds` 表示定时器到期的秒数，到期时向调用进程发送 `SIGALRM`  信号
+- 调用 `alarm()` 会覆盖对定时器的前一个设置，调用 `alarm(0)` 可以屏蔽现有定时器
+- 返回值是定时器前一设置距离到期的剩余描述，如果之前并无设置，则返回 0
+
+## `setitimer()` 和 `alarm()` 之间的交互
+
+Linux 中 `alarm()` 和 `setitimer()`  针对同一进程共享一个实时定时器，无论调用两者之中的哪个完成了对定时器的前一设置，同样可以调用二者中的任一函数来改变这一设置。
+
+程序设置实时定时器时，最好选用二者之一。
+
+# 定时器的调度和精度
+
+内核配置项 `CONFIG_HIGH_RES_TIMERS` 可以支持高分辨率定时器，使得定时器的精度不受软件时钟周期的影响，可以达到底层硬件所支持的精度，在现代硬件平台上，精度达到微秒级别是司空见惯的。
+
+# 为阻塞操作设置超时
+
+实时定时器的用途之一就是为某个阻塞系统调用设置其处于阻塞状态的时间上限。
+
+例如，处理 `read()` 操作：
+
+- 调用 `sigaction()` 创建  `SIGALRM` 信号的处置函数，排除 `SA_RESTART` 标志以确保系统调用不会重新启动
+- 调用 `alarm()` 或者 `setitimer()` 创建定时器，设置超时时间
+- 执行阻塞的系统调用
+- 系统调用返回，再次调用 `alarm()` 或 `setitimer()` 屏蔽定时器
+- 检查系统调用失败是否设置 `errno` 为 `EINTR` ，即系统调用遭到中断
+
+# 暂停运行一段固定时间
+
+## 低分辨率休眠：`sleep()`
+
+```
+#include <unistd.h>
+
+unsigned int sleep(unsigned int seconds);
+```
+
+- `sleep()` 可以暂停调用进程执行  `seconds` 秒，或者在捕获信号后恢复进程的执行
+- 如果休眠正常结束，返回0，如果因信号中断休眠，返回剩余的秒数
+- 考虑到一致性，应该避免 `sleep()` 和 `alarm()` 以及 `setitimer()` 之间的混用，Linux 将 `sleep()` 实现为对 `nanosleep()` 的调用
+
+## 高分辨率休眠 `nanosleep()`
+
+```
+#include <time.h>
+
+int nanosleep(const struct timespec *req, struct timespec *rem);
+```
+
+
+
+
+
+ 
+
+
+
+
+
 
 
 
