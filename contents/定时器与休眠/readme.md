@@ -328,15 +328,49 @@ int timer_delete(timer_t timerid);
 
 ## 通过信号发出通知
 
+如果选择通过信号来接收定时器通知，那么处理这些信号时既可以采用信号处理器函数，也可以调用 `sigwaitinfo()` 或是 `sigtimerdwait()`。接收进程借助于这两种方法可以获取一个 `siginfo_t` 结构：
 
+- `si_signo`：包含由定时器产生的信号
+- `si_code`：置为 `SI_TIMER`，表示这是因为 POSIX 定时器到期而产生的信号
+- `si_value`：设置为以 `timer_create()`创建定时器在 `evp.sigev_value` 中提供的值
 
+为  `evp.sigev_value` 指定不同的值，可以将到期时发送同类信号的不同定时器区分开。
 
+Linux 还为 `siginfo_t` 结构提供了如下非标准字段：
+
+- `si_overrun`： 包含了定时器溢出个数
 
 ## 定时器溢出
 
+假设已经选择通过信号传递的方式来接收定时器到期的通知。在捕获或接收相关信号之前定时器到期多次，或者不论直接调用 `sigprocmask()` 还是在信号处理器函数中暗中处理，也都有可能堵塞相关信号的发送，那如何知道这些定时器溢出？
+
+接收到定时器信号之后，有两种方法可以获取定时器的溢出值：
+
+- 调用 `timer_getoverrun()`
+- 使用随信号一同返回的结构  `siginfo_t` 中的  `si_overrun` 字段值，这种方法可以避免 `timer_getoverrun()` 调用开销，但是这种方法是 Linux 扩展方法，无法移植
+
+```
+#define _POSIX_C_SOURCE 199309L
+#include <time.h>
+
+int timer_getoverrun(timer_t timerid);
+```
+
+- 每次收到定时器信号后，都会重置定时器溢出计数，若自处理或接收定时器信号之后，定时器仅到期一次，则溢出计数为 0
+- 返回由参数 `timerid` 指定的定时器的溢出值
+- `timer_getoverrun()` 是异步信号安全的函数，故而在信号处理器函数内部调用也是安全的
+
+## 通过线程来通知
+
+`SIGEV_THREAD` 标志允许程序从一个独立的线程中调用函数来获取定时器到期通知。
+
+# 利用文件描述符进行通知的定时器
 
 
 
+
+
+ 
 
 
 
