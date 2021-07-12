@@ -366,6 +366,33 @@ int timer_getoverrun(timer_t timerid);
 
 # 利用文件描述符进行通知的定时器
 
+Linux 内核特有的创建定时器的 timerfd API，可从文件描述符中读取其所创建定时器的到期通知。
+
+```
+#include <sys/timerfd.h>
+
+int timerfd_create(int clockid, int flags);
+```
+
+- `timerfd_create()` 创建一个新的定时器对象，并返回一个指代该对象的文件描述符
+- `clockid` 的值，可以是：`CLOCK_REALTIME` 或者 `CLOCK_MONOTONIC`
+- `flags` 最初必须设置为0现在支持：
+  - 
+
+```
+#include <sys/timerfd.h>
+
+int timerfd_settime(int fd, int flags,const struct itimerspec *new_value,struct itimerspec *old_value);
+```
+
+
+
+```
+#include <sys/timerfd.h>
+
+int timerfd_gettime(int fd, struct itimerspec *curr_value);
+```
+
 
 
 
