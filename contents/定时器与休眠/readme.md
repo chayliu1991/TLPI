@@ -92,7 +92,7 @@ unsigned int sleep(unsigned int seconds);
 
 - `sleep()` 可以暂停调用进程执行  `seconds` 秒，或者在捕获信号后恢复进程的执行
 - 如果休眠正常结束，返回0，如果因信号中断休眠，返回剩余的秒数
-- 考虑到一致性，应该避免 `sleep()` 和 `alarm()` 以及 `setitimer()` 之间的混用，Linux 将 `sleep()` 实现为对 `nanosleep()` 的调用
+- 考虑到一致性，应该避免 `sleep()` 和 `alarm()` 以及 `setitimer()` 之间的混用，Linux 将 `sleep()` 实现为对 `nanosleep()` 的调用，而有些老系统使用 `alarm()` 和  `SIGALRM` 信号处理函数实现 `sleep()`
 
 ## 高分辨率休眠 `nanosleep()`
 
@@ -101,6 +101,25 @@ unsigned int sleep(unsigned int seconds);
 
 int nanosleep(const struct timespec *req, struct timespec *rem);
 ```
+
+- `nanosleep()` 与 `sleep()` 相似，但是分辨率更高
+-  `struct timespec`：
+
+```
+struct timespec {
+        time_t tv_sec;        /* seconds */
+        long   tv_nsec;       /* nanoseconds */
+};
+```
+
+- 规范规定不得使用信号实现该函数，这意味着 `nanosleep()` 与 `alarm()` 和  `setitimer()` 混用，也不会危及程序的可移植性
+- 尽管 `nanosleep()` 没有使用信号，但还是可以通过信号处理器函数将其中断，此时将返回 -1，并设置错误 `EINTR`，如果 `remain` 不为 `NULL`，则该指针所指向的缓冲区将返回剩余的休眠时间，可以利用这个返回值重启该系统调用以完成休眠，但是由于返回的 `remain` 时间未必是软件时钟间隔的整数倍，故而每次重启都会遭受取整，其结果是，每次重启后的休眠时间都要长于前一调用返回的 `remain` 值，在信号接收频率很高的情况下，进程的休眠可能永远也结束不了，使用 `TIMER_SBSTIME` 选项的 `clock_nanosleep()` 可以避免这个问题
+
+# POSIX 时钟
+
+Linux 中需要使用 realtime，实时函数库，需要链接 `librt` 即需要加入 `-lrt` 选项。
+
+## 获取时钟的值
 
 
 
