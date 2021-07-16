@@ -1,5 +1,5 @@
 CC = gcc
-Targets = real_timer timed_read nanosleep ptmr_sigev_signal ptmr_sigev_thread
+Targets = real_timer timed_read nanosleep ptmr_sigev_signal ptmr_sigev_thread timerfd
 
 all : $(Targets)
 
@@ -17,6 +17,9 @@ ptmr_sigev_signal :
 
 ptmr_sigev_thread :
 	$(CC) $(CFLAGS) -o ptmr_sigev_thread ptmr_sigev_thread.c -lrt -lpthread
+
+timerfd:
+	$(CC) $(CFLAGS) -o timerfd timerfd.c -lrt
 
 
 clean:
