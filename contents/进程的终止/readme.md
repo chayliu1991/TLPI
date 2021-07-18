@@ -81,6 +81,21 @@ int atexit(void (*function)(void));
 int on_exit(void (*function)(int , void *), void *arg);
 ```
 
+- `on_exit()` 是 glibc 提供的一个非标准方法
+
+# `fork()`，`stdio` 缓冲区以及 `_exit()` 之间的交互
+
+进程的用户空间内存中维护了 `stdio` 缓冲区，`fork()`  调用将会复制这些缓冲区。
+
+标准输出默认是行缓冲的，文件默认是块缓冲的。
+
+可以采取下面的方法避免 `fork()`  导致的缓冲区问题：
+
+- 在调用 `fork()` 之前使用 `fflush()` 来刷新缓冲区，也可以使用 `setvbuf()` 或者 `setbuf()` 来关闭流的缓冲功能
+- 子进程可以调用 `_exit()` 而非 `exit()` ，以便不再刷新 `stdio()`  缓冲区，这也是一个通用原则：在创建子进程的应用中，典型的情况是父进程调用 `exit()` 终止，而其他进程调用 `_exit()` 终止，从而确保只有一个进程调用退出处理程序并刷新 `stdio`  缓冲区
+
+
+
 
 
 
