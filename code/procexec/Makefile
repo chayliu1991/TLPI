@@ -1,5 +1,5 @@
 CC = gcc
-Targets = fork fork_file_sharing vfork fork_whos_on_first fork_signal_sync exit_handlers fork_stdio_buf
+Targets = fork fork_file_sharing vfork fork_whos_on_first fork_signal_sync exit_handlers fork_stdio_buf multi_wait print_wait_status
 
 all : $(Targets)
 
@@ -18,11 +18,18 @@ fork_whos_on_first :
 fork_signal_sync:
 	$(CC) $(CFLAGS) -o fork_signal_sync fork_signal_sync.c
 
-exit_handlers:
+exit_handlers :
 	$(CC) $(CFLAGS) -o exit_handlers exit_handlers.c
 
-fork_stdio_buf:
+fork_stdio_buf :
 	$(CC) $(CFLAGS) -o fork_stdio_buf fork_stdio_buf.c
+
+multi_wait :
+	$(CC) $(CFLAGS) -o multi_wait multi_wait.c
+
+print_wait_status :
+	$(CC) $(CFLAGS) -o print_wait_status print_wait_status.c
+
 
 clean:
 	-rm -rf $(Targets)
