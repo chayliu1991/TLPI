@@ -82,7 +82,7 @@ void handler(int sig)
 }
 ```
 
-# 系统调用 `waitid()`
+## 系统调用 `waitid()`
 
 ```
 #include <sys/types.h>
@@ -146,6 +146,87 @@ else
 	//@ a child changed state,details are provided in infop
 }
 ```
+
+## 系统调用 `wait3()` 和 `wait4()`
+
+```
+#define _BSD_SOURCE
+
+#include <sys/types.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <sys/wait.h>
+
+pid_t wait3(int *wstatus, int options,struct rusage *rusage);
+pid_t wait4(pid_t pid, int *wstatus, int options,struct rusage *rusage);
+```
+
+- 这两个系统调用的名称源于参数的个数
+- `wait3()` 和 `wait4()` 在参数 `rusage` 所指向的结构中返回终止子进程的资源使用情况，其中包括进程使用的 CPU 时间总量以及内存管理的统计数据
+- 调用  `wait3()` 等同于调用 `waitpid(-1,&status,options)`，即 `wait3()` 等待的是任意子进程
+- 调用 `wait4()` 等同于调用 `wait(pid,&status,options)`，即 `wait4()` 等待选定的一个或多个子进程
+
+# 孤儿进程与僵尸进程
+
+对于孤儿进程，即父进程已经终止的进程，init 进程将成为其父进程，某一进程的父进程终止后，对 `getppid()`  调用将返回 1。
+
+子进程终止，在父进程调用 `wait()` 之前，内核将子进程转为僵尸进程，此时将子进程的大部分资源释放以供其他进程使用，只保留内核进程表中的一条记录，其中包含了子进程 ID、终止状态、资源使用数据信息。僵尸进程无法通过信号杀死，即便是 `SIGKILL` 也不可以，从而确保了父进程总是可以执行 `wait()`方法，从而从系统中删除僵尸进程。
+
+# SIGCHLD 信号
+
+子进程的终止属于异步时间，父进程无法预先得知，即使父进程向子进程发送 `SIGKILL` 信号，子进程终止的确切时间依赖于系统调度。
+
+两种策略：
+
+- 父进程调用不带 `WNOHANG` 标志的 `wait()`，或者 `waitpid()` 方法，此时如果尚无已经终止的子进程，那么调用将会阻塞
+- 父进程周期性地调用带有 `WNOHANG` 标志的 `waitpid()`，执行针对已经终止子进程的非阻塞检查
+
+这两种方法都有弊端：
+
+- 不希望父进程阻塞
+- 不希望反复调用非阻塞的 `waitpid()`  浪费  CPU 资源
+
+为了规避上述问题，可以采用针对 `SIGCHLD` 信号的处理程序。
+
+## 为 SIGCHLD 建立信号处理程序
+
+无论一个子进程何时终止，系统都会向父进程发送  `SIGCHLD`  信号，对该信号的默认处理是将其忽略，也可以安装信号处理程序来捕捉信号，在处理程序中，可以使用 `wait()` ；来收尸。
+
+当调用信号处理程序时，会暂时将引发调用的信号阻塞起来，除非为 `sigaction()` 指定了 `SA_NODEFER` 标志，并且也不会为 `SIGCHLD` 这样的标准信号排队，这将导致如果 `SIGCHLD` 信号处理程序正在执行时，如果有其他子进程终止，父进程也不能捕获信号，从而有漏网之鱼。
+
+解决办法是，在 `SIGCHLD` 处理程序内部循环以 `WNOHANG` 标志来调用 `waitpid()`，直到再无其他终止的子进程需要处理为止，通常信号处理程序的形式：
+
+```
+while(waitpid(-1,NULL,WNOHANG) > 0)
+	continue;
+```
+
+另外：
+
+- 为了保证移植性，要在所有子进程创建之前，设置信号处理程序
+- 在信号处理程序中系统调用有可能会改变 `errno` 的值，所以在编写信号处理程序时，需要使用本地 变量保存 `errno`，在返回时恢复
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

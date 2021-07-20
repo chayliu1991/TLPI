@@ -1,5 +1,5 @@
 CC = gcc
-Targets = fork fork_file_sharing vfork fork_whos_on_first fork_signal_sync exit_handlers fork_stdio_buf multi_wait print_wait_status
+Targets = fork fork_file_sharing vfork fork_whos_on_first fork_signal_sync exit_handlers fork_stdio_buf multi_wait print_wait_status make_zombie multi_SIGCHILD
 
 all : $(Targets)
 
@@ -30,6 +30,11 @@ multi_wait :
 print_wait_status :
 	$(CC) $(CFLAGS) -o print_wait_status print_wait_status.c
 
+make_zombie :
+	$(CC) $(CFLAGS) -o make_zombie make_zombie.c
+
+multi_SIGCHILD :
+	$(CC) $(CFLAGS) -o multi_SIGCHILD multi_SIGCHILD.c
 
 clean:
 	-rm -rf $(Targets)
