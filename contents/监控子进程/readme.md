@@ -214,6 +214,10 @@ while(waitpid(-1,NULL,WNOHANG) > 0)
 
 ## 忽略终止的子进程
 
+默认情况下 `SIGCHLD` 信号将会被忽略，也可以显示对 `SIGCHLD` 信号设置为 `SIG_IGN`，此时子进程终止时将立即丢弃其状态，不会转为僵尸进程。
+
+
+
 
 
 
