@@ -1,5 +1,6 @@
 CC = gcc
-Targets = fork fork_file_sharing vfork fork_whos_on_first fork_signal_sync exit_handlers fork_stdio_buf multi_wait print_wait_status make_zombie multi_SIGCHILD
+Targets = fork fork_file_sharing vfork fork_whos_on_first fork_signal_sync exit_handlers fork_stdio_buf multi_wait print_wait_status make_zombie multi_SIGCHILD execve envargs execlp \
+	execle execl
 
 all : $(Targets)
 
@@ -35,6 +36,21 @@ make_zombie :
 
 multi_SIGCHILD :
 	$(CC) $(CFLAGS) -o multi_SIGCHILD multi_SIGCHILD.c
+
+execve :
+	$(CC) $(CFLAGS) -o execve execve.c
+
+envargs :
+	$(CC) $(CFLAGS) -o envargs envargs.c
+
+execlp :
+	$(CC) $(CFLAGS) -o execlp execlp.c
+
+execle:
+	$(CC) $(CFLAGS) -o execle execle.c
+
+execl:
+	$(CC) $(CFLAGS) -o execl execl.c
 
 clean:
 	-rm -rf $(Targets)

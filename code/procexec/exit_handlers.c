@@ -32,7 +32,7 @@ static void onExitFunc(int exitStatus,void* arg)
     printf("on_exit function called:status:%d,arg=%ld\n",exitStatus,(long)arg);
 }
 
-int main(int argc,char* argv)
+int main(int argc,char* argv[])
 {
      if(on_exit(onExitFunc,(void*)10) != 0)
     {
