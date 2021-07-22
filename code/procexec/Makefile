@@ -1,6 +1,6 @@
 CC = gcc
 Targets = fork fork_file_sharing vfork fork_whos_on_first fork_signal_sync exit_handlers fork_stdio_buf multi_wait print_wait_status make_zombie multi_SIGCHILD execve envargs execlp \
-	execle execl
+	execle execl closeonexec system
 
 all : $(Targets)
 
@@ -51,6 +51,14 @@ execle:
 
 execl:
 	$(CC) $(CFLAGS) -o execl execl.c
+
+system :
+	$(CC) $(CFLAGS) -o system system.c
+
+closeonexec :
+	$(CC) $(CFLAGS) -o closeonexec closeonexec.c
+
+
 
 clean:
 	-rm -rf $(Targets)
