@@ -1,6 +1,6 @@
 CC = gcc
 Targets = fork fork_file_sharing vfork fork_whos_on_first fork_signal_sync exit_handlers fork_stdio_buf multi_wait print_wait_status make_zombie multi_SIGCHILD execve envargs execlp \
-	execle execl closeonexec system
+	execle execl closeonexec system acct_on clone
 
 all : $(Targets)
 
@@ -59,6 +59,11 @@ closeonexec :
 	$(CC) $(CFLAGS) -o closeonexec closeonexec.c
 
 
+acct_on:
+	$(CC) $(CFLAGS) -o acct_on acct_on.c
+
+clone:
+	$(CC) $(CFLAGS) -o clone clone.c
 
 clean:
 	-rm -rf $(Targets)

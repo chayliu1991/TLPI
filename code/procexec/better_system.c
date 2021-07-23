@@ -58,7 +58,9 @@ int system(char* command)
 
     saveErrno = errno;
     sigprocmask(SIG_SETMASK,&oriMask,NULL);
-    sigprocmask(SIG_SETMASK,&oriMask,NULL);
-    sigprocmask(SIG_SETMASK,&oriMask,NULL);
-  
+    sigprocmask(SIGINT,&saOrigInt,NULL);
+    sigprocmask(SIGQUIT,&saOrigQuit,NULL);
+    
+    errno = saveErrno;
+    return status;
 }
