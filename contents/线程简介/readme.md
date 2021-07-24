@@ -131,6 +131,65 @@ int pthread_join(pthread_t thread, void **retval);
 
 # 线程的分离
 
+默认情况下，线程是 `joinable`，也就是线程退出时，其他线程可以通过调用 `pthread_join()` 获取其返回状态。有时并不关心线程的返回状态，只是希望系统在线程终止时能够自动清理，此时可以调用 `pthread_detach()` 函数。
+
+```
+#include <pthread.h>
+
+int pthread_detach(pthread_t thread);
+```
+
+- 一旦线程调用了 `pthread_detach()` ，那么就不能使用 `pthread_join()` 来获取其状态
+- 其他线程调用了 `exit()` 或是主线程调用了 `return` 语句，即便遭到分离的线程也还是会受此影响，此时，不管线程处于 `joinable` 状态还是 `detach` 状态，进程的所有线程会立即终止，换言之，`pthread_detach()` 只是控制线程终止之后发生的事情，而非何时或如何终止线程。
+
+# 线程属性
+
+线程属性在线程创建时指定，一旦线程创建完成，就无需保留属性对象，可以将其销毁。
+
+```
+pthread_t thr;
+pthread_attr_t attr;
+int s;
+
+s = pthread_attr_init(&attr);
+if(s != 0)
+    errExit("pthread_attr_init()");
+
+s = pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED);
+if(s != 0)
+    errExit("pthread_attr_setdetachstate()");
+
+s = pthread_create(&thr,&attr,threadFunc,(void*)1);
+if(s != 0)
+    errExit("pthread_create()");
+
+s = pthread_destroy(&attr);
+if(s != 0)
+    errExit("pthread_destroy()");
+```
+
+# 线程 VS 进程
+
+线程相对于进程的优点：
+
+- 线程间的数据共享很简单，相比之下，进程间的数据共享需要投入更多
+- 创建线程的速度要比创建进程更快
+- 线程间的上下文切换耗时也要比进程短很多
+
+线程相对于进程的缺点：
+
+- 多线程编程时，需要确保线程安全的函数，或者以线程安全的方式调用函数，多线程无需关注这些
+- 某个线程中的  bug 可能会危及进程的所有线程，因为它们共享着相同的地址空间和其他属性，相比之下，进程间的隔离更彻底
+- 每个线程都在争用宿主进程中有限的虚拟地址空间，与之相反，每个进程都可以使用全部的有效虚拟内存，仅受制于实际内存和交换空间
+
+影响选择的还有如下几点：
+
+- 在多线程应用中处理信号时要特别小心，一般建议在多线程程序中避免使用信号
+- 在多线程应用中，所有的线程必须运行于同一个程序，对于多进程应用，不同的进程可以运行于不同的程序
+- 除了数据，线程还可以共享某些其他信息，例如：文件描述符，信号处理，当前工作目录，用户 ID 和组 ID
+
+
+
 
 
 
