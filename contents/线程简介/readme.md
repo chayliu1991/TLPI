@@ -117,6 +117,32 @@ int pthread_equal(pthread_t t1, pthread_t t2);
 
 # join 已终止的线程
 
+```
+#include <pthread.h>
+
+int pthread_join(pthread_t thread, void **retval);
+```
+
+- `pthread_join()` 等待 `thread` 标识的线程终止
+- 若 `retval` 非空，则将会保存线程终止时返回值的拷贝，该返回值是线程调用 `return` 或者 `pthread_exit()` 是指定的值
+- 多次对同一个线程执行 `pthread_join()`  将导致无法预知的行为
+- 如果线程没有 `detach` 则必须使用 `pthread_join()` 来进行等待，如果没有 `join()`，线程将成为僵尸线程，除了导致资源浪费，僵尸线程积累过多，应用将再也无法创建新的线程
+- 线程之间的关系是对等的，并无层次关系，进程中的任一线程均可以调用 `pthread_join()` 来等待任何一个其他的线程
+
+# 线程的分离
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
