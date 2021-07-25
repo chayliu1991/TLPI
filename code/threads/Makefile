@@ -1,5 +1,5 @@
 CC = gcc
-Targets = simple_thread thread_incr thread_incr_mutex thread_multi_join strerror strerror_tsd strerror_tls
+Targets = simple_thread thread_incr thread_incr_mutex thread_multi_join strerror strerror_tsd strerror_tls pthread_cancel thread_cleanup
 FLAGS = -lpthread
 
 all : $(Targets)
@@ -25,6 +25,11 @@ strerror_tsd:
 strerror_tls:
 	$(CC) $(CFLAGS) -o strerror_tls strerror_tls.c $(FLAGS)
 
-	
+pthread_cancel:
+	$(CC) $(CFLAGS) -o pthread_cancel pthread_cancel.c $(FLAGS)
+
+thread_cleanup:
+	$(CC) $(CFLAGS) -o thread_cleanup thread_cleanup.c $(FLAGS)
+
 clean:
 	-rm -rf $(Targets)
