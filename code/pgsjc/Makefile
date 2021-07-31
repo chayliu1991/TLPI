@@ -1,5 +1,5 @@
 CC = gcc
-Targets = setsid catch_SIGHUP disc_SIGHUP job_mon handling_SIGTSTP
+Targets = setsid catch_SIGHUP disc_SIGHUP job_mon handling_SIGTSTP orphaned_pgrp_SIGHUP
 
 all : $(Targets)
 
@@ -17,6 +17,10 @@ job_mon:
 
 handling_SIGTSTP:
 	$(CC) $(CFLAGS) -o handling_SIGTSTP handling_SIGTSTP.c
+
+orphaned_pgrp_SIGHUP:
+	$(CC) $(CFLAGS) -o orphaned_pgrp_SIGHUP orphaned_pgrp_SIGHUP.c
+
 
 clean:
 	-rm -rf $(Targets)
