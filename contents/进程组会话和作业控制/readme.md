@@ -271,7 +271,7 @@ init 进程只会检查被终止的子进程清理该僵尸进程，从而导致
 
 ### 孤儿进程组和 SIGTSTP、SIGTTIN、以及 SIGTTOU 信号
 
-
+如果 `SIGTSTP`、`SIGTTIN`、以及 `SIGTTOU` 信号的分送会导致停止孤儿进程组中的成员，那么这个信号会被毫无征兆地丢弃。
 
 
 
