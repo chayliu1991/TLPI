@@ -162,6 +162,122 @@ int sched_getparam(pid_t pid, struct sched_param *param);
 
 ### 防止实时进程锁住系统
 
+由于 `SCHED_RR` 和 `SCHED_FIFO` 进程会抢占所有优先级的进程，因此在开发使用这些策略时需要注意可能会发生失控的实时进程因一直占用 CPU 而导致锁住系统的情况，在程序中可以通过一些方法来避免这种情况：
+
+- 使用 `setrlimit()` 设置一个合理的低软 CPU 时间组员限制，如果进程消耗了太多的 CPU 时间，那么它将收到一个 `SIGXCPU` 信号，该信号在默认情况下会杀死进程
+- 使用 `alarm()` 设置一个警报定时器，如果进程的运行时间超出了 `alarm()` 调用指定的秒数，那么该进程会被 `SIGALARM` 信号杀死
+- 创建一个拥有高实时优先级的看门狗进程，这个进程可以进行无限循环，每次循环都睡眠指定的时间间隔，然后醒来并监控其他进程的状态，并使用 `sched_getscheduler()` 和 `sched_param()` 来检查进程的调度策略和优先级，如果一个进程看起来行为异常，那么看门狗线程可以降低进程的优先级或向其发送合适的信号来停止或者终止进程
+- `RLIMIT_RTTIME` 的单位是秒，它限制了一个进程在不执行阻塞式系统调用时能够消耗的 CPU 时间，当进程执行了这样的系统调用时，累积消耗的 CPU 时间将会被重置为 0，当这个进程被一个优先级更高的进程抢占时，累积消耗的 CPU 时间不会被重置，当进程的时间片被消耗完或调用 `sched_yield()` 时进程会放弃 CPU，当进程到达了 CPU 时间限制 `RLIMIT_CPU` 之后，系统会向其发送一个 `SIGXCPU` 信号，该U信号在默认情况下会杀死这个进程
+
+### 避免子进程进程特权调度策略
+
+`SCHED_RESET_ON_FORK`  可以指定为 `sched_setscheduler()` 中的 `policy` 参数，如果设置了这个标记，那么由这个进程使用 `fork()` 创建的子进程就不会继承特权调度策略和优先级，其规则为：
+
+- 如果调用进程拥有一个实时调度策略，那么子进程的策略会被重置为标准的循环时间分享策略 `SCHED_OTHER`
+- 如果进程的 nice 值为负值，那么子进程的 nice 值会被重置为 0
+
+一旦进程启用了 `SCHED_RESET_ON_FORK` 标记，那么只有特权进程才能够仅有该标记，当子进程被创建出来以后，它的 `reset-on-fork` 标记会被禁用。
+
+## 释放 CPU
+
+实时进程可以通过两种方式自愿释放 CPU：通过调用一个阻塞进程的系统调用或者调用 `sched_yield()`。
+
+```
+#include <sched.h>
+
+int sched_yield(void);
+```
+
+- `sched_yield()` 的操作比较简单，如果存在与调用进程的优先级相同的其他排队的可运行进程，那么调用进程会被放在队列的队尾，队列中队头的进程将会被调度使用 CPU，如果在该优先级队列中不存在可运行的进程，那么调用 `sched_yield()` 不会做任何事情，调用进程会继续使用 CPU
+- 非实时进程使用 `sched_yield()` 的结果是未定义的
+
+# SCHED_RR 时间片
+
+```
+#include <sched.h>
+
+int sched_rr_get_interval(pid_t pid, struct timespec *tp);
+```
+
+- `sched_rr_get_interval()` 能够找出 `SCHED_RR` 进程每次被授权使用 CPU 时分配到的时间片的长度
+
+# CPU 亲和力
+
+当一个进程在一个多处理系统上被重新调度时无需在上一次执行的  CPU 上运行，之所以如此是因为原来的 CPU 有可能处于忙碌状态。
+
+进程切换 CPU 时对性能会有一定的影响：如果在原来的 CPU 的高速缓冲器中存在进程的数据，那么为了将进程的一行数据加载进新 CPU 的高速缓冲器中，首先必须使这行数据失效(即在没被修改的情况下丢弃数据，在被修改的情况下将数据写入内存)，因为在多处理器架构中，为防止高速缓冲器不一致的情况，某个时刻只允许数据存在一个 CPU 的高速缓冲器上。这个失效的过程将会消耗时间，由于存在这个性能上的影响，进程保证软 CPU 亲和力在条件允许的情况下进程重新被调度到原来的  CPU 上运行。
+
+设置 CPU 亲和力，将进程限制在一个或一组 CPU 上的原因：
+
+- 可以避免由使高速缓冲器中的数据失效所带来的性能影响
+- 如果多个线程或者进程访问同样的数据，那么当将它们限制在同样的 CPU 上的话可能会带来性能提升，因为它们无需竞争数据并且也不存在由此而产生的高速缓冲器未命中
+- 对于时间关键的应用程序来说，可能需要为此应用预留一个或更多 CPU，而将系统中大多数进程限制在其他 CPU 上
+
+```
+#define _GNU_SOURCE    
+#include <sched.h>
+
+int sched_setaffinity(pid_t pid, size_t cpusetsize,const cpu_set_t *mask);
+```
+
+- `sched_setaffinity()` 设置 `pid` 进程的  CPU 亲和力，如果 `pid` 是 0，那么调用进程的 CPU 亲和力就会被改变
+- CPU 亲和力是一个线程级特性，可以调整线程组中各个进程的 CPU 亲和力，如果需要修改一个多线程中某个特定线程的 CPU 亲和力的话，可以将 `pid` 设定为线程中的 `gettid()` 调用返回值，将 `pid` 设置为 0, 则表示调用线程
+-  `cpusetsize` 是指定 `mask` 参数的字节数即 `sizeof(cpu_set_t)`
+- `cpu_set_t` 是一个位掩码，但应该将其视为一个不透明的结构，所有对这个结构的操作都应该使用：
+
+```
+#define _GNU_SOURCE         
+#include <sched.h>
+
+void CPU_ZERO(cpu_set_t *set);
+void CPU_SET(int cpu, cpu_set_t *set);
+void CPU_CLR(int cpu, cpu_set_t *set);
+int  CPU_ISSET(int cpu, cpu_set_t *set);
+```
+
+- `CPU_ZERO()` 将 `set` 初始化为空
+
+- `CPU_SET()` 将 CPU cpu 添加到 `set` 中
+
+- `CPU_CLR()` 从 `set` 中删除 CPU cpu 
+
+- `CPU_ISSET()` 在 CPU cpu 是 `set` 的一个成员时返回 `true`
+
+- CPU 集合中的 CPU 从 0 开始编号，`<sched.h>` 中定义了常量 `CPU_SETSIZE` 是比 `cpu_set_t` 变量能够表示的最大 CPU 编号还要大的一个数字
+
+  
+
+下面的代码将 `pid` 标识出的进程限制在 4 个 处理器上除第一个 CPU 之外的任意 CPU 上运行：
+
+```
+cpu_set_t set;
+
+CPU_ZERO(&set);
+CPU_SET(1,&set);
+CPU_SET(2,&set);
+CPU_SET(3,&set);
+
+sched_setaffinity(pid,CPU_SETSIZE,&set);
+```
+
+如果 `set` 中指定的 CPU 与系统中的所有 CPU 都不匹配，那么 `sched_setaffinity()` 调用将会返回 `EINVAL` 错误。
+
+如果运行调用进程的 CPU 不包括在 `set` 中，那么进程会被迁移到 `set` 中的一个 CPU 上。
+
+非特权进程只有在其有效用户 ID 与目标进程的真实或有效用户 ID 匹配时才能够设置目标进程的 CPU 亲和力，特权进程(`CAP_SYS_NICE`) 进程可以设置任意进程的 CPU 亲和力。
+
+```
+#define _GNU_SOURCE 
+#include <sched.h>
+
+int sched_getaffinity(pid_t pid, size_t cpusetsize,cpu_set_t *mask);
+```
+
+- `sched_getaffinity()` 返回的 CPU 亲和力掩码位于 `mask` 指向的 `cpu_set_t` 的结构中，同时将 `cpusetsize` 参数设置为结构中包含的字节数，即 `sizeof(cpu_set_t)`，使用 `CPU_ISSET()` 宏能够确定哪些  CPU 位于 `set` 中
+- 如果目标进程的 CPU 亲和力掩码并没有被修改过，那么 `sched_getaffinity()` 返回包含系统中所有  CPU 的集合
+- `sched_getaffinity()` 不会检查权限，非特权进程能够获取系统上所有进程的 CPU 亲和力掩码
+
+通过 `fork()` 创建的子进程会继承其父进程的 CPU 亲和力掩码，并且在 `exec()` 调用之间掩码会得以保留。
 
 
 
@@ -169,6 +285,9 @@ int sched_getparam(pid_t pid, struct sched_param *param);
 
 
 
+
+
+ 
 
 
 
