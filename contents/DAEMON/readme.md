@@ -60,9 +60,122 @@ int becomeDaemon(int flags);
 
 # 使用 syslog 记录消息和错误
 
+## 概述
 
+`syslog` 工具提供了一个集中式日志工具，系统中的所有应用程序都可以使用这个工具来记录日志消息。
 
+![](./img/syslog.png)
 
+`syslog` 工具有两个主要组件：syslogd daemon 和 `syslog(3)` 库函数。
+
+System Log daemon syslogd 从两个不同的源接收日志消息：
+
+- UNIX domain socket `/dev/log`，它保存本地产生的消息
+- Internet domain socket，它保存通过 TCP/IP 网络发送的消息
+
+每条由 syslogd 处理的消息都具备几个特性：
+
+- 一个 facility，它指定了产生消息的程序类型
+- 一个 level，它指定了消息的严重程度
+
+syslogd daemon 会检查每条详细的 facility 和 level，然后根据一个相关配置文件 `/etc/syslog.conf` 中的指令消息传递到几个可能的目的地中的一个。可能的目的地包括：终端，虚拟控制台，磁盘文件，FIFO，一个或多个登录过的用户以及位于另一个系统上的通过 TCP/IP 网络连接的进程。
+
+通常任意进程都可以使用 `syslog(3)` 库函数来记录消息，这个函数会使用传入的参数以标准的格式构建一条消息，然后将这条消息写入 `/dev/log` socket 以供 syslogd 读取。
+
+`/dev/log` 中的消息另一个来源是 Kernel Log damon klogd，它会收集内核日志消息，这些消息的收集可以通过两个等价的 Linux 特有接口(`/proc/kmask` 文件和 `syslog(2)` 系统调用) 中的一个来完成，然后使用 `syslog(3)` 库函数将它们写入 `/dev/log`。
+
+## syslog API
+
+### 建立一个到系统日志的连接
+
+```
+#include <syslog.h>
+
+void openlog(const char *ident, int option, int facility);
+```
+
+- `openlog()` 调用是可选的，它建立一个到系统日志工具的连接，并为后续的 `syslog()` 调用设置默认设置
+- `ident` 是一个指向字符串的指针，`syslog()` 输出的每条消息都会包含这个字符串，这个参数的取值通常是程序名，如果 `ident` 的值是 `NULL`，那么 glibc syslog 实现会自动将程序名作为 `ident` 的值
+- `option` 是一个位掩码：
+  - `LOG_CONS`：当向系统日志发送消息发生错误时将消息写入到系统控制台 `/dev/console`
+  - `LOG_NDELAY`：立即打开到日志系统的连接，在默认情况下，只有在首次使用 `syslog()`  记录消息的时候才会打开连接
+  - `LOG_NOWAIT`：不要 `wait()` 被创建来记录日志消息的子进程，在那些创建子进程来记录日志消息的实现上，当调用者创建并等待子进程时就需要使用 `LOG_NOWAIT`，这样 `syslog()` 就不会试图等待已经被调用者毁掉的子进程，在 Linux 上，`LOG_NOWAIT` 不起任何作用，因为在记录日志消息时不会创建子进程
+  - `LOG_ODELAY`：这个标记的作用与 `LOG_NDELAY` 相反，连接到日志系统的操作会被延迟至记录第一条消息时，这是默认行为，因此无需指定这个标记
+  - `LOG_PERROR`：将消息写入标准错误和系统日志，通常，daemon 进程会关闭标准错误或将其重定向到 `/dev/null`，这样 `LOG_PERROR` 就没有用了
+  - `LOG_PID`：在每条消息中加上调用者的进程 ID
+- `facility` 参数指定了后续的 `syslog()` 调用中使用的默认的 `facility` 值，可选参数：
+
+![](./img/facility.png)
+
+### 记录一条日志消息
+
+```
+#include <syslog.h>
+
+void syslog(int priority, const char *format, ...);
+```
+
+- `priority` 参数是 `facility` 值和 `level` 值的 OR 值，`facility` 表示记录日志消息的应用程序的类别
+- `level` 表示消息的严重程度：
+
+![](./img/level.png)
+
+ 常用法：
+
+```
+openlog(argv[0],LOG_PID |  LOG_CONS | LOG_NOWAIT,LOG_LOCALO);
+syslog(LOG_ERROR,"bad ragument :%s",argv[1]);
+syslog(LOG_USER | LOG_INFO,"Exiting");
+```
+
+### 关闭日志
+
+```
+#include <syslog.h>
+
+void closelog(void);
+```
+
+- 当完成日志记录之后，可以调用 `closelog()` 来释放分配给 `/dev/log` socket 的文件描述符
+
+### 过滤日志消息
+
+```
+#include <syslog.h>
+
+void setlogmask(int mask_priority);
+```
+
+- `setlogmask()` 设置了一个能过滤由 `syslog()` 写入的消息的掩码
+
+`LOG_MASK()` 可以将 `level`  的值转换成适合传入 `setlogmask()` 的位值：
+
+```
+setlogmask(LOG_MASK(LOG_EMERG) | LOG_MASK(LOG_ALERT) | LOG_MASK(LOG_CRIT) | LOG_MASK(LOG_ERR));
+```
+
+Linux 中提供了标准中未规定的 `LOG_UPTO()` 宏，它创建一个能过滤特定级别以及以上的所有消息的位掩码，可以将上面的代码简化为：
+
+```
+setlogmask(LOG_UPTO(LOG_ERR));
+```
+
+ ## `/etc/syslog.conf` 文件
+
+`/etc/syslog.conf` 配置文件控制 syslogd daemon 的操作，这个文件由规则和注释构成，规则的形式如下：
+
+```
+facility.level 			action
+```
+
+- `facility` 和 `level` 组合在一起称为选择器，选择需应用规则的消息
+- `action` 指定了与选择器匹配的消息被发送到何处 	
+
+每次修改 `syslog.conf` 文件之后都需要使用下面的方式让 daemon 根据这个文件重新初始化自身：
+
+```
+killall -HUP syslogd
+```
 
 
 
