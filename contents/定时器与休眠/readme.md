@@ -377,7 +377,9 @@ int timerfd_create(int clockid, int flags);
 - `timerfd_create()` 创建一个新的定时器对象，并返回一个指代该对象的文件描述符
 - `clockid` 的值，可以是：`CLOCK_REALTIME` 或者 `CLOCK_MONOTONIC`
 - `flags` 最初必须设置为0现在支持：
-  - 
+  - `TFD_CLOEXEC`：为新的文件描述符设置运行时关闭标志 `FD_CLOEXEC` 与 `open()` 的 `O_CLOEXEC` 适用于相同的情况
+  - `TFD_NONBLOCK`：为底层的打开文件描述符设置 `O_NONBLOCK` 标志，随后的读操作将是非阻塞的
+- `timerfd_create()` 创建的定时器使用完毕后，应该调用 `close()` 关闭相应的文件描述符，以便内核释放相应的资源
 
 ```
 #include <sys/timerfd.h>
@@ -385,13 +387,38 @@ int timerfd_create(int clockid, int flags);
 int timerfd_settime(int fd, int flags,const struct itimerspec *new_value,struct itimerspec *old_value);
 ```
 
-
+- `timerfd_settime()` 可以启动或解除由文件描述符 `fd` 指代的定时器
+- `new_value` 为指定的新设置，`old_value` 为前一设置，如果不关心前一个设置可以将其设置为 `NULL`
+- `flags` 参数可以是0，此时将 `new_value.it_value` 的值视为相对于调用 `timerfd_settime()` 的相对时间点，也可以设置为 `TFD_TIMER_ABSTIME` 将其视为从时钟0点开始测量的绝对时间点 
 
 ```
 #include <sys/timerfd.h>
 
 int timerfd_gettime(int fd, struct itimerspec *curr_value);
 ```
+
+- `timerfd_gettime()` 返回文件描述符 `fd` 所标识的定时器间隔和剩余时间
+- 如果返回的 `curr_value.it_value` 字段都是0，那么该定时器已经被解除，如果返回的结构 `curr_value.it_interval` 中的两个字段都是0，那么定时器只会到期一次，到期时间在 `curr_value.it_value` 中给出
+
+## timerfd 与 `fork()` 以及 `exec()` 之间的交互
+
+调用 `fork()` 期间，子进程会继承 `timerfd_create()` 所创建的文件描述符的拷贝。
+
+`timerfd_create()` 创建额度文件描述符能够跨越 `exec()` 得以保存，除非将描述符设置为运行时关闭，已配备的定时器在 `exec()` 之后会继承生成到期通知。
+
+## 从 timerfd 文件描述符读取
+
+一旦以 `timer_settime()` 启动了定时器，就可以从相应文件描述符中调用 `read()` 来读取定时器的到期信息，处于这一目的，传给 `read()` 的缓冲区必须满足容纳一个 `uint64_t` 类型的要求。
+
+在上次使用 `timerfd_settime()` 修改设置以后，或者是最后一次执行 `read()`  后，如果发生了一起或多起定时器到期时间，那么 `read()` 立即返回，返回的缓冲区中包含了到期的次数。 
+
+如果并无定时器到期，`read()` 将会阻塞至下一个到期。
+
+也可以执行 `fcntl()` 设置 `O_NONBLOCK` 标志，这时的读动作将是非阻塞的，如果没有定时器到期，则返回，设置错误 `EAGAIN`。
+
+ 可以使用 `select()`，`poll()` 和 `epoll()` 对 `timerfd` 文件描述符进行监控，如果定时器到期，则将对应的文件描述符标记为可读。
+
+
 
 
 
