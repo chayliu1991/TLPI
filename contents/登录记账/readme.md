@@ -75,3 +75,47 @@ void setutxent(void);
 void endutxent(void);
 ```
 
+`getutxent()`、`getutxid()` 和 `getutxline()` 函数从 utmp 文件中读取一个记录并返回一个指向 utmpx 结构（静态分配）的指针：
+
+```
+#include <utmpx.h>
+
+struct utmpx *getutxent(void);
+struct utmpx *getutxid(const struct utmpx *ut);
+struct utmpx *getutxline(const struct utmpx *ut);
+```
+
+- `getutxent()` 函数顺序读取下一个 utmp 文件中的下一个记录，`getutxid()` 和 `getutxline()` 函数会从当前文件位置开始搜索与 `ut` 参数指向的 utmpx 结构中指定的标准匹配的一个记录
+- `getutxid()` 函数根据 `ut` 参数中 `ut_type` 和 `ut_id` 字段的值在 utmp 文件中搜索一个记录
+
+- 如果 `ut_type` 字段是 `RUN_LVL`、`BOOT_TIME`、`NEW_TIME` 或 `OLD_TIME`，那么 `getutxid()` 会找出下一个 `ut_type` 字段与指定的值相匹配的记录(这种类型的记录与用户登录不相关）。这样就能够搜索与修改系统时间和运行级别相关的记录了
+- 如果 `ut_type` 字段是剩余有效值中的一个，那么 `getutxid()` 会找出下一个 `ut_type` 字段与这些值中的任意一个匹配且 `ut_id` 字段与 `ut` 参数相同的记录，这样就能够扫描文件来找出对应于某个特定终端的记录了
+
+`getutxline()` 函数会向前搜索 `ut_type` 字段为 `LOGIN_PROCESS` 或 `USER_PROCESS` 并且 `ut_line` 字段与 `ut` 参数指定的值匹配的记录。这对于找出与用户登录相关的记录是非常有用的。
+
+当搜索失败时（即达到文件结尾时还未找到匹配的记录），`getutxid()` 和 `getutxline()` 都返回 `NULL`。
+
+由于 `getutx*` 函数返回的是一个指向静态分配的结构的指针，因此它们是不可重入的。GNU C 库提供了传统的 utmp 函数的可重入版本（`getutent_r()`、`getutid_t()`、`getutline_r()`），但并没有为 utmpx 函数提供可重入版本。
+
+在默认情况下， 所有 `getutx*` 函数都使用标准的 utmp 文件。如果需要使用另一个文件，如 wtmp 文件，那么必须要首先调用 `utmpxname()` 并指定目标路径名。
+
+```
+#define _GUN_SOURCE
+#include <utmpx.h>
+
+int utmpxname(const char *file);
+```
+
+`utmpxname()` 函数仅仅将传入的路径名复制一份，它不会打开文件，但会关闭之前由其他调用打开的所有文件。这就表示就算制定了一个无效的路径名，`utmpxname()` 也不会返回错误。
+
+# 获取登录名称：`getlogin()`
+
+`getlogin()` 函数返回登录到调用进程的控制终端的用户名，它会使用在utmp文件中维护的信息：
+
+```
+#include <unistd.h>
+
+char *getlogin(void);
+int getlogin_r(char *buf, size_t bufsize);
+```
+
