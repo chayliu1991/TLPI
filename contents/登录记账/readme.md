@@ -119,3 +119,53 @@ char *getlogin(void);
 int getlogin_r(char *buf, size_t bufsize);
 ```
 
+`getlogin()` 会调用 `ttypname()` 来找出与调用进程的标准输入相关联的终端名，接着它搜索 utmp 文件以找出 `ut_line` 值与终端名相匹配的记录。如果找到了匹配的记录，那么 `getlogin()` 会返回记录中的 `ut_user` 字符串。
+
+如果没有找到匹配的记录或者发生了错误，那么 `getlogin()` 会返回 `NULL` 并设置 `errno` 来标示错误。`getlogin()` 失败原因可能是进程没有一个与其标准输入相关联的终端（`ENOTTY`），这可能是因为进程本身是一个 daemon。另一个可能的原因是终端会话并没有记录在 utmp 文件中，比如一些软件终端模拟器不会在utmp 文件中创建条目
+
+即使当一个用户ID在 `/etc/passwd` 文件中拥有多个登录名时(不常见)，`getlogin()` 还是能返回登录这个终端的时机名，因为它依赖的是 utmp 文件。相反，`getpwuid(getuid())` 总是会返回 `/etc/passwd` 中第一个匹配的记录，不管登录名是什么。
+
+`LOGNAME` 环境变量也可以用来找出用户的登录名，但是用户可以改变这个变量的值，这表示无法使用这个变量来安全的识别出一个用户。
+
+# 为登录会话更新 utmp 和 wtmp 文件
+
+在编写一个创建登录会话的应用程序（如像 login 或 sshd 那样）时应该要按照下面的步骤更新 utmp 和 wtmp 文件
+
+- 在登录的时候应该向 utmp 文件写入一条记录表明这个用户登录进系统了。应用程序必须要检测 utmp 文件中是否存在这个终端的记录。如果已经存在了一个记录，那么必须重写这个记录，否则就在文件的后面附加一个新纪录。通常调用 `pututxline()` 就足以确保正确执行这些步骤了。输出的 utmpx 记录至少需要填充 `ut_type`、`ut_user`、`ut_tv`、`ut_pid`、`ut_id` 以及 `ut_line` 字段：
+  - `ut_type` 字段应该被设置成 `USER_PROCESS`
+  - `ut_id` 字段应该包含用户登录的设备名（即终端或伪终端）的后缀
+  - `ut_line` 字段应该包含登录设备的名称中去除了开头的 `/dev/` 的字符串
+  - 一个包含完全一样的信息的记录会被附加到 wtmp 文件中
+- utmp 文件中的记录以终端名（`ut_line` 和 `ut_id` 字段）作为唯一键
+- 在登出的时候应该删除之前写入 utmp 文件的记录，这是通过创建一个记录并将 `ut_type` 设置为 `DEAD_PROCESS`、同时将 `ut_id` 和 `ut_line`  设置为登录时写入的记录中相应字段的值并将 `ut_user` 字段的值置零来完成的。这个记录会覆盖之前的记录，同时这个记录的一个副本会被附加到 `wtmp` 文件中
+- 如果在登出时没有成功清理 utmp 中的相关记录(可能是因为程序崩溃)，那么在下一次重启的时候，init 会自动清理这些记录并将记录的 `ut_type` 设置为`DEAD_PROCESS` 以及将记录中其他字段置零
+- 通常 utmp 和 wtmp 文件是受保护的，只有特权用户可以更新这些文件。`getlogin()` 的精确程度依赖于 utmp 文件的完整性。正因为这个原因以及其他一些原因，在 utmp 和 wtmp 文件的权限设置中应该永远都不允许非特权用户写这两个文件
+
+`pututxline()` 函数会将 `ut` 指向的 utmpx 结构写入到 `/var/run/utmp` 文件中（或者如果之前调用了 `utmpxname()` 的话将是另一个文件）。
+
+```
+#include <utmpx.h>
+
+struct utmp *pututline(struct utmp *ut);
+```
+
+- 在写入记录之前，`pututxline()` 首先会使用 `getutxid()` 向前搜索一个可被重写的记录。如果找到了这样的记录，那么会重写该记录，否则就会在文件尾附加一个新记录
+- 在很多情况下，应用程序在调用 `pututxline()` 之前会调用其中一个 `getutx*` 函数，因为这个函数会将当前文件位置设定到正确的记录
+- 如果 `pututxline()` 能够确定已经重置过了当前文件位置，那么就不会调用 `getutxid()`
+- 如果 `pututxline()` 在内部调用了 `getutxid()`，那么这个调用不会改变 `getutx*` 函数用来返回 utmpx 结构的静态区域，SUSv3 要求实现遵循这种行为
+
+在更新 wtmp 文件时仅仅是简单地打开文件并在文件尾附加一个记录。由于这是一个标准操作，因此 glibc 将其封装进了 `updwtmpx()` 函数。
+
+```
+#define _GNU_SPURCE
+#include <utmp.h>
+
+void updwtmpx(const char *wtmpx_file, const struct utmpx *ut);
+```
+
+- `updwtmpx()` 函数将 `ut` 指向的 utmpx 记录附加到 `wtmpx_file` 指定的文件尾
+
+
+
+
+
