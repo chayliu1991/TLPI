@@ -1,5 +1,5 @@
 CC = gcc
-Targets = simple_pipe pipe_sync pipe_ls_wc popen_glob
+Targets = simple_pipe pipe_sync pipe_ls_wc popen_glob fifo_sequem_server fifo_sequem_client
 
 all : $(Targets)
 
@@ -14,6 +14,12 @@ pipe_ls_wc:
 
 popen_glob:
 	$(CC) $(CFLAGS) -o popen_glob popen_glob.c
+
+fifo_sequem_server:
+	$(CC) $(CFLAGS) -o fifo_sequem_server fifo_sequem_server.c
+
+fifo_sequem_client:
+	$(CC) $(CFLAGS) -o fifo_sequem_client fifo_sequem_client.c
 
 clean:
 	-rm -rf $(Targets)
