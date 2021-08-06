@@ -270,9 +270,26 @@ ipcrm -Q msgkey 移除用msqkey创建的消息队列
 ipcrm -q msqid 移除用msqid标识的消息队列
 ipcrm -S semkey 移除用semkey创建的信号
 ipcrm -s semid 移除用semid标识的信号
-
-
 ```
+
+# 获取所有 IPC 对象列表
+
+Linux 提供了两种获取系统上所有 IPC 对象列表的非标准方法
+
+- `/proc/sysvipc` 目录中的文件会列出所有 IPC 对象
+- 使用 Linux 特有的 `ctl` 调用
+
+`/proc/sysvipc` 目录中三个只读文件提供的信息与通过 `ipcs` 获取的信息是一样的。
+
+- `/proc/sysvipc/msg` 列出所有消息队列及其特性
+- `/proc/sysvipc/sem` 列出所有信号量集及其特性
+- `/proc/sysvipc/shm` 列出所有共享内存段及其特性
+
+# IPC 限制
+
+由于 System V IPC 对象会消耗系统资源，因此内核对各种 IPC 对象进行了各式各样的限制，以防止资源耗尽。
+
+
 
 
 
