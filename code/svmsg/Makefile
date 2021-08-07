@@ -1,5 +1,5 @@
 CC = gcc
-Targets = svmsg_create svmsg_send svmsg_receive svmsg_rm svmsg_chqbytes svmsg_ls 
+Targets = svmsg_create svmsg_send svmsg_receive svmsg_rm svmsg_chqbytes svmsg_ls  svmsg_file_server svmsg_file_client
 
 all : $(Targets)
 
@@ -20,6 +20,13 @@ svmsg_chqbytes:
 
 svmsg_ls:
 	$(CC) $(CFLAGS) -o svmsg_ls svmsg_ls.c
+
+svmsg_file_server:
+	$(CC) $(CFLAGS) -o svmsg_file_client svmsg_file_client.c
+
+svmsg_file_client:
+	$(CC) $(CFLAGS) -o svmsg_file_server svmsg_file_server.c
+
 
 clean:
 	-rm -rf $(Targets)
