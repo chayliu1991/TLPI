@@ -1,5 +1,5 @@
 CC = gcc
-Targets = svmsg_demo svsem_mon  svsem_setall
+Targets = svmsg_demo svsem_mon  svsem_setall svsem_op
 
 
 all : $(Targets)
@@ -16,6 +16,8 @@ svsem_setall:
 svsem_good_init:
 	$(CC) $(CFLAGS) -o svsem_good_init svsem_good_init.c
 
+svsem_op:
+	$(CC) $(CFLAGS) -o svsem_op svsem_op.c
 
 clean:
 	-rm -rf $(Targets)

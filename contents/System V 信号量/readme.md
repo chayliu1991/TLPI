@@ -231,6 +231,54 @@ else
 /* Now perform some operation on the semaphore */
 ```
 
+# 信号量操作
+
+```
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
+
+int semop(int semid, struct sembuf *sops, unsigned nsops);
+```
+
+- `semop()` 系统调用在 `semid`  标识的信号量集中的信号量上执行一个或多个操作
+- `sops` 参数是一个指向数组的指针，数组中包含了需要执行的操作，`nsops` 参数给出了数组的大小（数组至少需包含一个元素）。操作将会按照在数组中的顺序以原子的方式被执行
+
+```
+struct sembuf
+{
+    unsigned short int sem_num;	/* semaphore number */
+    short int sem_op;		/* semaphore operation */
+    short int sem_flg;		/* operation flag */
+};
+```
+
+- `sem_num` 字段标识了了在集合中的哪个信号量上执行操作。`sem_op`  字段指定了需执行的操作：
+  - 如果 `sem_op` 大于0，那么就将 `sem_op` 的值加到信号量值上，其结果是其他等待减小信号量值的进程可能会被唤醒并执行它们的操作。调用进程必须要具备在信号量上的修改（写）权限。
+  - 如果 `sem_op` 等于 0，那么就对信号量值进行检查以确定它当前是否等于 0。如果等于0，那么操作将立即结束，否则 `semop()` 就会阻塞直到信号量值变成 0 为止。调用进程必须要具备在信号量上的读权限
+  - 如果 `sem_op` 小于 0，那么就将信号量值减去 `sem_op`。如果信号量的当前值大于或等于 `sem_op` 的绝对值，那么操作会立即结束。否则 `semop()` 会阻塞直到信号量值增长到在执行操作之后不会导致出现负值的情况为止。调用进程必须要具备在信号量上的修改权限
+
+从语义上来讲，增加信号量值对应于使一种资源变得可用以便其他进程可以使用它，而减小信号量值则对应于预留（互斥地）进程需使用的资源。在减小一个信号量值时，如果信号量的值太低，即其他一些进程已经预留了这个资源，那么操作就会被阻塞。
+
+当 `semop()` 调用阻塞时，进程会保持阻塞直到发生下列某种情况为止：
+
+- 另一个进程修改了信号量值使得待执行的操作能够继续向前
+- 一个信号中断了 `semop()` 调用。发生这种情况时会返回 `EINTR` 错误（`semop()`在被一个信号处理器中断之后是不会自动重启的）
+- 另一个进程删除了 `semid` 引用的信号量。发生这种情况时 `semop()` 会返回 `EIDRM`  错误
+
+在特定信号量上执行一个操作时可以通过在相应的 `sem_flg` 字段中指定 `IPC_NOWAIT` 标记来防止 `semop()` 阻塞。此时，如果 `semop()` 本来要发生阻塞的话就会返回 `EAGAIN` 错误。
+
+尽管通常一次只会操作一个信号量，但也可以通过一个 `semop()` 调用在一个集合中的多个信号量上执行操作。这里需要指出的关键一点是这组操作的执行是原子的，即 `semop()` 要么立即执行所有操作，要么就阻塞直到能够同时执行所有操作。
+
+```
+#define _GNU_SOURCE
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
+
+int semtimedop(int semid, struct sembuf *sops, unsigned nsops,struct timespec *timeout);
+```
+
 
 
 
