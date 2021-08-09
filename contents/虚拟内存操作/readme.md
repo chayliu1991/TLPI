@@ -131,3 +131,20 @@ int mincore(void *addr, size_t length, unsigned char *vec);
 
 # 建议后续内存使用模式
 
+`madvise()` 通过通知内核调用进程对起始地址为 `addr` 长度为 `length` 字节的范围之内分页的可能的使用情况来提升应用程序的性能。内核可能会使用这种信息来提升分页之下的文件映射IO效率。
+
+```
+#include <sys/mman.h>
+
+int madvise(void *addr, size_t length, int advice);
+```
+
+- `addr` 中的值必须是分页对齐的，`length` 实际上会被向上舍入到系统分页大小的下一个整数倍。
+- `advice` 参数的取值为下列之一：
+  - `MADV_NORMAL` ：这是默认行为。分页是以簇的形式（较小的一个系统分页大小的整数倍）传输的。这个值会导致一些预先读和事后读
+  - `MADV_RANDOM` ：这个区域中的分页会被随机访问，这样预先读将不会带来任何好处，因此内核在每次读取时所取出的数据量应该尽可能少
+  - `MADV_SEQUENTIAL` ：在这个范围中的分页只会被访问一次，并且是顺序访问，因此内核可以激进地预先读，并且分页在被访问之后就可以将其释放了
+  - `MADV_WILLNEED`：预先读取这个区域中的分页以备将来的访问之需。`MADV_WILLNEED` 操作的效果与 Linux 特有的 `readahead()` 系统调用和 `posix_fadvise() POSIX_FADV_WILLNEED` 操作的效果类似
+  - `MADV_DONTNEED` ：调用进程不再要求这个区域中的分页驻留在内存中。这个标记的精确效果在不同 UNIX 实现上是不同的
+
+大多数 UNIX 实现都提供了一个 `madvise()`，它们通常至少支持上面描述的 advice 常量。然而 SUSv3 使用了一个不同的名称来标准化了这个 API，即 `posix_madvise()`，并且在相应的 `advice` 常量上加上了一个前缀字符串 `POSIX_`。因此，这些常量变成了 `POSIX_MADV_NORMAL`、`POSIX_MADV_RANDOM`、`POSIX_MADV_SEQUENTIAL`、`POSIX_MADV_WILLNEED` 等等。
