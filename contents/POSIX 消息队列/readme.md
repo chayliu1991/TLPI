@@ -52,6 +52,56 @@ mqd_t mq_open(const char *name, int oflag, mode_t mode,struct mq_attr *attr);
 
  ## 关闭一个消息队列
 
+```
+#include <mqueue.h>
+
+int mq_close(mqd_t mqdes);
+```
+
+- `mq_close()` 函数关闭了消息队列描述符 `mqdes`
+
+如果调用进程已经通过 `mqdes` 在队列上注册了消息通知，那么通知注册会自动被删除，并且另一个进程可以随后向该队列注册消息通知。
+
+当进程终止或者调用 `exec()` 时，消息队列描述符会被自动关闭。问问价描述符一样，应用程序应该在不再使用消息队列描述符的时候显示的关闭消息队列描述符以防止进程耗尽消息队列描述符的情况。
+
+与文件上的 `close()` 一样，关闭一个消息队列并不会删除该队列。要删除队列必须显示的调用 `mq_unlink()`，它是 `unlink()` 在消息队列上的版本。
+
+## 删除一个消息队列
+
+`mq_unlink()` 函数删除通过 `name` 标识的消息队列，并将队列标记为在所有进程使用完该队列之后销毁该队列。
+
+```
+#include <mqueue.h>
+
+int mq_unlink(const char *name);
+```
+
+# 描述符和消息队列之间的关系
+
+消息队列是一个进程级别的句柄，它引用了系统层面的打开的消息队列描述符中的一个条目，而该条目引用了一个消息队列对象，如下图：
+
+![](./img/mq_kernel.png)
+
+- 一个打开的消息队列描述拥有一组关联的标记。SUSv3 只规定了一种这样的标记，即 `NONBLOCK`，它确定了 IO 是否是非阻塞的
+- 两个进程能够持有引用同一个打开的消息队列描述的消息队列描述符。当一个进程在打开了一个消息队列之后调用 `fork()` 时就会发生这样的情况。这些描述符会共享 `O_NONBLOCK` 标记的状态
+- 两个进程能够持有引用不同消息队列描述(它们引用了同一个消息队列)的打开的消息队列描述（如进程 A 中的描述符 z 和进程 B 中的描述符 y 都引用了/mq-r）。当两个进程分别使用 `mq_open()` 打开同一个队列时就会发生这种情况
+
+# 消息队列特性
+
+`mq_open()`、`mq_getattr()` 以及 `mq_setattr()` 函数都会接收一个参数，它是一个指向 `mq_attr` 结构的指针。这个结构是在 `<mqueue.h>` 中进行定义的，其形式如下：
+
+```
+struct mq_attr
+{
+    long mq_flags;	/* Message queue flags.  */
+    long mq_maxmsg;	/* Maximum number of messages.  */
+    long mq_msgsize;	/* Maximum message size.  */
+    long mq_curmsgs;	/* Number of messages currently queued.  */
+};
+```
+
+
+
 
 
 
