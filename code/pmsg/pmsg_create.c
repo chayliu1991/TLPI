@@ -42,14 +42,34 @@ int main(int argc,char* argv[])
     {
         switch (opt)
         {
-        case /* constant-expression */:
-            /* code */
+        case 'c':
+            flags |= O_CREAT;
             break;
-        
+        case 'm':
+            attr.mq_maxmsg = atoi(optarg);
+            attrp = &attr;
+            break;
+        case 's':
+            attr.mq_msgsize = atoi(optarg);
+            attrp = &attr;
+            break;
+        case 'x':
+            flags |= O_EXCL;
+            break;
         default:
             break;
         }
     }
+
+    if(optind >= argc)
+    {
+        usageError(argv[0]);
+    }
+
+    perms = (argc <= optind + 1) ? (S_IRUSR | S_IWUSR) : atoi(argv[optind+1]);
+    mqd = mq_open(argv[optind],flags,perms,attrp);
+    if(mqd == (mqd_t) - 1)
+        errExit("mq_open()");
 
     exit(EXIT_SUCCESS);
 }
