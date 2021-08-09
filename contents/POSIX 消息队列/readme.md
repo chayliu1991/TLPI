@@ -1,11 +1,3 @@
-POSIX 消息队列与 System V 消息队列的相似之处在于数据的交换单位是整个消息，但它们之间存在一些显著的差异：
-
-- POSIX 消息队列是引用计数的。只有当所有当前使用队列的进程都关闭了之后才会对队列进程标记以便删除
-- 每个 System V 消息都有一个整数类型，并且通过 `msgrcv()` 可以以各种方式选择消息。而 POSIX 消息由一个管理的优先级，并且消息之间是严格按照优先级顺序排队(以及接收)的
-- POSIX 消息队列提供了一个特性允许在队列中的一条消息可用时异步的通知进程
-- POSIX 消息通知特性运行一个进程能够在一条消息进入空队列时异步通知信号或者线程的实例化来接受通知
-- 在Linux上可以使用 `poll`、`select`、`epoll` 来监听 POSIX 消息队列。System V 消息没有这个特性
-
 # 概述
 
 POSIX 消息队列 API 的主要函数如下：
@@ -150,6 +142,173 @@ if(mq_setattr(mqd, &attr, NULL) == -1){
 	errExit("mq_setattr()");
 }
 ```
+
+# 交换消息
+
+## 发送消息
+
+```
+#include <mqueue.h>
+
+int mq_send(mqd_t mqdes, const char *msg_ptr,size_t msg_len, unsigned int msg_prio);
+```
+
+- `mq_send()` 函数将位于 `msg_ptr` 指向的缓冲区中的消息添加到描述符 `mqdes` 所引用的消息队列中
+
+- `msg_len` 参数指定了 `msg_ptr` 指向的消息的长度，其值必须小于或者等于队列的 `mq_msgsize` 特性，否则 `mq_send()` 就会返回`EMSGSIZE` 错误。长度为零的消息是允许的
+- 每个队列都拥有一个用非负整数表示的优先级，它通过 `msq_prio` 指定。0表示优先级最低，数值越大优先级越高。当一个消息被添加到队列中时，他会被放置在队列中具有相同优先级的所有消息之后。如果一个应用程序无需使用消息优先级，那么只需要将`msg_prio` 指定为 0 即可
+- SUSv3 允许一个实现为消息优先级规定一个上限，这可以通过定义常量 `MQ_PRIO_MAX` 或通过规定 `sysconf(_SC_MQ_PRIO_MAX)` 的返回值来完成
+- 如果消息队列已经满了（即已经达到了队列的 `mq_maxmsg` 限制），那么后续的 `mq_send()` 调用会阻塞直到队列中存在可用空间为止或者在 `O_NONBLOCK` 标记起作用时立即失败并返回 `EAGAIN` 错误
+
+## 接收消息
+
+```
+#include <mqueue.h>
+
+ssize_t mq_receive(mqd_t mqdes, char *msg_ptr,size_t msg_len, unsigned int *msg_prio);
+```
+
+- `mq_receive()` 从 `mqdes` 引用的消息队列中删除一条优先级最高、存在时间最长的消息并将删除的消息放置在 `msq_ptr` 指向对的缓冲区
+- 调用者通过 `msq_len` 指定 `msg_ptr` 指向的缓冲区中可用字节数
+- 不管消息的实际大小是什么，`msg_len`（即 `msg_ptr` 指向的缓冲区的大小）必须要大于或等于队列的 `mq_msgsize` 特性，否则 `mq_receive()` 就会失败并返回 `EMSGSIZE` 错误
+- 如果 `msg_prio` 不为 `NULL`，那么接收到的消息的优先级会被复制到 `msg_prio` 指向的位置处
+- 如果消息队列当前为空，那么 `mq_receive()` 会阻塞直到存在可用的消息或在 `O_NONBLOCK` 标记起作用时会立即失败并返回 EAGAIN 错误
+
+## 在发送和接收消息时设置超时时间
+
+```
+#include <time.h>
+#include <mqueue.h>
+
+int mq_timedsend(mqd_t mqdes, const char *msg_ptr,size_t msg_len, unsigned int msg_prio,const struct timespec *abs_timeout);
+
+ssize_t mq_timedreceive(mqd_t mqdes, char *msg_ptr,size_t msg_len, unsigned int *msg_prio,const struct timespec *abs_timeout);
+```
+
+- `mq_timedsend()` 和 `mq_timedreceive()` 函数与 `mq_send()` 和 `mq_receive()` 几乎是完全一样的，它们之间唯一的差别在于如果操作无法立即被执行，并且该消息队列描述上的 `O_NONBLOCK` 标记不起作用，那么 `abs_timeout` 参数就会为调用阻塞的时间指定一个上限
+- 如果 `mq_timedsend()` 或 `mq_timedreceive()` 调用因超时而无法完成操作，那么调用就会失败并返回 `ETIMEDOUT` 错误
+- 在 Linux 上将 `abs_timeout` 指定为 `NULL` 表示永远不会超时，但这种行为并没有在 SUSv3中得到规定，因此可移植的应用程序不应该依赖这种行为
+
+# 消息通知
+
+POSIX 消息队列区别于 System V 消息队列的一个特性是 POSIX 消息队列能够接收之前为空的队列上有可用消息的异步通知（即队列从空变成了非空）。这个特性意味着已经无需指向一个阻塞的调用或者将消息队列描述符标记为非阻塞并在队列上定期指向 `mq_receive()` 消息了，进程可以选择通过信号的形式或者通过在一个单独的线程中调用一个函数的形式来接受通知。
+
+`mq_notify()` 函数注册调用进程在一条消息进入描述符 `mqdes` 引用的空队列时接收通知：
+
+```
+#include <mqueue.h>
+
+int mq_notify(mqd_t mqdes, const struct sigevent *sevp);
+```
+
+- 在任意时刻都只有一个进程(“注册进程”)能够向一个特定的消息队列注册接收通知。如果一个消息队列上已经存在注册线程了，那么后续在该队列上的注册请求将会失败（`mq_notify()` 返回 `EBUSY` 错误）
+- 只有当一条新消息进入空队列时才会发送通知。如果队列不空就不会发送通知消息
+- 当向注册进程发送一个通知之后就会删除注册消息，之后任何进程就能够向队列注册接收通知了。换句话说，只要一个进程想要持续的接收通知，那么它就必须要在每次接收通知之后再次调用 `mq_notify()` 注册自己
+- 注册进程只有在当前不存在其他在该队列上调用 `mq_receive()` 而发生阻塞的进程时才会收到通知。如果其他进程在 `mq_receive()`调用中被阻塞了，那么该进程会读取消息，注册进程会保持注册状态
+- 一个进程可以通过在调用 `mq_notify()` 时传入一个值为 `NULL` 的 `notification` 参数来撤销自己在消息通知上的注册信息
+
+`sigevent` 中与 `mq_notify()` 相关的字段：
+
+```
+union sigval{
+	int sival_int;
+	void *sival_ptr;
+};
+
+struct sigevent{
+	int sigev_notify;
+	int sigev_signo;
+	union sigval sifev_value;
+	void (*sigev_notify_function)(union sigval);
+	void *sigev_notify_attributes;
+};
+```
+
+- `sigev_notify` 字段将会被设置成下列值中的一个
+  - `SIGEV_NONE`：注册这个进程接收通知，但当一条消息进入空队列时不通知该进程。与往常一样，当新消息进入空队列之后注册信息会被删除
+  - `SIGEV_SIGNAL`：通过生成一个在 `sigev_signo` 字段中指定的信号来通知进程。如果 `sigev_signo` 是一个实时信号，那么`sigev_value` 字段将会指定信号都带的数据。通过传入信号处理器的 `siginfo_t` 结构中的 `si_value` 字段或通过调用 `sigwaitinfo()` 或 `sigtimedwait()` 返回值能够取得这部分数据。`siginfo_t` 结构中的下列字段也会被填充：`si_code`，其值为 `SI_MESGQ`；`si_signo`，其值是信号编号；`si_pid`，其值是发送消息的进程的进程 ID；以及 `si_uid`，其值是发送消息的进程的真实用户 ID。（`si_pid` 和 `si_uid` 字段在其他大多数实现上不会被设置
+  - `SIGEV_THREAD`：通过调用在 `sigev_notify_function` 中指定的函数来通知进程，就像是在一个新线程中启动该函数一样。`sigev_notify_attributes` 字段可以为 `NULL` 或是一个指向定义了线程的特性的 `pthread_ attr_t` 结构的指针。`sigev_value` 中指定的联合 `sigval` 值将会作为参数传入这个函数
+
+# Linux 特有的特性
+
+POSIX 消息队列在 Linux 上的实现提供了一些非标准的却相当有用的特性。
+
+## 通过命令行显示和删除消息队列对象
+
+POSIX IPC 对象被实现成了虚拟文件系统中的文件，并且可以使用 `ls` 和 `rm` 来列出和删除这些文件。为列出和删除 POSIX 消息队列就必须要使用乤命令来将消息队列挂载到文件系统中：
+
+```
+mount  -t mqueue source target
+```
+
+source 可以是任意一个名字（通常将其指定为字符串 `none`），其唯一的意义是它将出现在 `/proc/mounts` 中并且 `mount` 和 `df` 命令会显示出这个名字。`target ` 是消息队列文件系统的挂载点。
+
+下面的 shell 会话显示了如何挂载消息队列文件系统和显示其内容。首先为文件系统创建一个挂载点并挂载它：
+
+```
+$ su
+
+$ mkdir /dev/mqueue
+$ mount -t mqueue node /dev/mqueue
+$ exit
+$ cat /proc/mounts | grep mqueue
+node /dev/mqueue mqueue rw,relatime 0 0
+$ ls -ld /dev/mqueue
+drwxr-xr-x 2 root root 0 Aug  9 21:28 /dev/mqueue
+```
+
+## 获取消息队列的相关信息
+
+```
+cat /dev/mqueue/mq
+QSIZE:7		NOTIFY:0 	SIGNO:0		NOTIFY_PID:0
+```
+
+`QSIZE` 字段的值为队列中所有数据的总字节数，剩下的字段则与消息通知相关，如果 `NOTIFY_PID` 为非零，那么进程 ID 为该值得进程已经向该队列注册接收消息通知剩下的字段则这种通知相关的信息。
+
+- `NOTIFY` 是一个与其中一个 `sigev_notify` 常量对应的值：
+  - 0 表示 `SIGEV_SIGNAL`
+  - 1 表示 `SIGEV_NONE`
+  - 2 表示 `SIGEV_THREAD`
+- 如果通知方式是 `SIGEV_SIGNAL`，那么 `SIGNO` 字段指出了哪个信号会用来分发消息通知
+
+## 使用另一种 I/O 模型操作消息队列
+
+在 Linux 中，消息队列描述符实际上是一个文件描述符，因此可以使用 IO 多路复用系统调用（`select()` 和 `poll()`）或 `epoll()` API 来监控这个文件描述符。
+
+# 消息队列限制
+
+SUSv3 为 POSIX 消息队列定义了两个限制：
+
+- `MQ_PRIO_MAX`：定义了一条消息的最大优先级
+- `MQ_OPEN_MAX`：一个实现可以定义这个限制来指明一个进程最多能打开的消息队列数量。SUSv3 要求这个限制最小为`_POSIX_MQ_OPEN_MAX`（8）。Linux 并没有定义这个限制，相反，由于 Linux 将消息队列描述符实现成了文件描述符，因此适用于文件描述符的限制将适用于消息队列描述符。（换句话说，在 Linux 上，每个进程以及系统所能打开的文件描述符的数量限制实际上会应用于文件描述符数量和消息队列描述符数量之和。）
+
+下面这三个文件位于 `/proc/sys/fs/mqueue` 目录中：
+
+- `msg_max`：这个限制为新消息队列的 `mq_maxmsg` 特性的取值规定了一个上限，默认值是 10，最小值是1，最大值由内核常量 `HARD_MSGMAX` 定义
+- `msgsize_max`：这个限制为非特权进程创建的新消息队列的 `mq_msgsize` 特性的取值规定了一个上限(即使用 `mq_open()` 创建队列时  `attr.mq_msgsize` 字段的上限值 )，默认值是 8192最小值是 128，当一个非特权进程 `CAP_SYS_RESOURCE` 调用 `mq_open()` 时会忽略这个限制
+- `queues_max`：这是一个系统级别的限制，它规定了系统上最多能够创建的消息队列的数量，一旦达到这个限制，就只有特权进程 `CAP_SYS_RESOURCE` 才能够创建新队列，默认值是 256，取值范围是 `[0,INT_MAX]`
+
+# POSIX 和 System V 消息队列比较
+
+POSIX 消息队列与 System V 消息队列的相似之处在于数据的交换单位是整个消息，但它们之间存在一些显著的差异：
+
+- POSIX 消息队列是引用计数的。只有当所有当前使用队列的进程都关闭了之后才会对队列进程标记以便删除
+- 每个 System V 消息都有一个整数类型，并且通过 `msgrcv()` 可以以各种方式选择消息。而 POSIX 消息由一个管理的优先级，并且消息之间是严格按照优先级顺序排队(以及接收)的
+- POSIX 消息队列提供了一个特性允许在队列中的一条消息可用时异步的通知进程
+- POSIX 消息通知特性运行一个进程能够在一条消息进入空队列时异步通知信号或者线程的实例化来接受通知
+- 在Linux上可以使用 `poll`、`select`、`epoll` 来监听 POSIX 消息队列。System V 消息没有这个特性
+
+但与 System V 消息队列相比，POSIX 消息队列也具备以下劣势：
+
+- POSIX 消息队列的可移植性稍差
+- 与 POSIX 消息队列严格按照优先级排序相比，System V 消息队列能够根据类型来选择消息的功能的灵活性更强。
+
+POSIX 消息队列支持是一个通过 `CONFIG_POSIX_MQUEUE` 选项配置的可选内核组件。
+
+
+
+
 
 
 
