@@ -1,5 +1,5 @@
 CC = gcc
-Targets = psem_create psem_unlink psem_post psem_getvalue
+Targets = psem_create psem_unlink psem_post psem_getvalue  thread_incr_psem
 
 
 all : $(Targets)
@@ -15,6 +15,11 @@ psem_post:
 
 psem_getvalue:
 	$(CC) $(CFLAGS) -o psem_getvalue psem_getvalue.c -lpthread
+
+thread_incr_psem:
+	$(CC) $(CFLAGS) -o thread_incr_psem thread_incr_psem.c -lpthread
+
+
 
 clean:
 	-rm -rf $(Targets)
