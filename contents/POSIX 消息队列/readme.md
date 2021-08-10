@@ -121,6 +121,7 @@ int mq_getattr(mqd_t mqdes, struct mq_attr *attr);
 ## 修改消息队列特性
 
 ```
+
 #include <mqueue.h>
 
 int mq_setattr(mqd_t mqdes, const struct mq_attr *newattr,struct mq_attr *oldattr);
