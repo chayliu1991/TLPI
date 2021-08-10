@@ -1,5 +1,5 @@
 CC = gcc
-Targets = t_flock  i_fcntl_locking region_locking
+Targets = t_flock  i_fcntl_locking region_locking create_pid_file
 
 
 all : $(Targets) 
@@ -11,6 +11,10 @@ i_fcntl_locking:
 
 region_locking:
 	$(CC) $(CFLAGS) -fPIC -shared -o libregionlocking.so region_locking.c
+
+create_pid_file:
+	$(CC) $(CFLAGS) -fPIC -shared -o libcreatepidfile create_pid_file.c
+
 
 clean:
 	-rm -rf $(Targets)
