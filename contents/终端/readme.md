@@ -368,6 +368,47 @@ int tcflow(int fd, int action);
 
 # 终端窗口的大小
 
+在一个窗口环境中，一个处理屏幕的应用程序需要能够监视终端窗口额度大小，内核对此提供了两种支持：
+
+- 在终端窗口大小改变后发送一个 `SIGWINCH` 信号之后，进程可以使用 `ioctl()` 的 `TIOCGWINSZ` 操作来获取终端窗口的当前大小
+- 在任意一个时刻，通常是接收到 `SIGWINCH` 信号之后，进程可以使用  `ioctl()` 的 `TIOCGWINSZ` 操作来获取终端窗口的当前大小
+
+```
+if(ioctl(fd,TIOCGWINSZ,&ws) == -1)
+	errExit("ioctl() - TIOCGWINSZ");
+```
+
+- `fd` 指向终端窗口的文件描述符
+-  `ws` 是一个  `winsize` 结构体：
+
+```
+struct winsize 
+{
+    unsigned short ws_row;    		/* rows， in character */
+    unsigned short ws_col;        	/* columns, in characters */
+    unsigned short ws_xpixel;    	/* horizontal size, pixels (unused) */
+    unsigned short ws_ypixel;    	/* vertical size, pixels (unused) */
+};
+```
+
+# 终端标识
+
+```
+#include <unistd.h>
+
+int isatty(int fd);
+```
+
+- `isatty()` 判断文件描述符 `fd` 是否同一个终端相关联
+
+```
+#include <unistd.h>
+
+char *ttyname(int fd);
+```
+
+- `ttyname()` 返回终端的名称
+
 
 
 
