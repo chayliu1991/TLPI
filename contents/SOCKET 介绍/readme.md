@@ -48,6 +48,139 @@ socket 存在于一个通信 domain 中，它确定：
 
 socket IO 可以使用传统的 `read()`，`write()` 或者使用 socket 特有的系统调用 `send()`，`recv()`，`sendto()`，`recvfrom()` 来完成。默认情况下，这些系统调用在 IO 操作无法立即完成时将会阻塞，通过使用 `fcntl() F_SETFL O_NONBLOCK` 设置非阻塞。
 
+# 创建一个 socket
+
+```
+#include <sys/types.h>
+#include <sys/socket.h>
+
+int socket(int domain, int type, int protocol);
+```
+
+- `socket()` 创建一个新 socket
+- `domain` 指定了 socket 的通信 domain
+- `type` 指定了 socket 类型：
+  - 创建流 socket 时会被指定为 `SOCK_STREAM`
+  - 创建数据报 socket 时会被指定为 `SOCK_DGRAM`
+- `protocol` 一般设置为 0
+
+# 将 socket 绑定到地址
+
+```
+#include <sys/types.h> 
+#include <sys/socket.h>
+
+int bind(int sockfd, const struct sockaddr *addr,socklen_t addrlen);
+```
+
+- `bind()` 将一个 socket 绑定到一个地址上
+- `sockfd` 是  `socket()` 调用中获得的文件描述符
+- `addr` 指向绑定的地址结构
+- `addrlen` 是绑定地址结构的大小
+
+一般来讲，会将一个服务器的 socket 绑定到一个众所周知的地址，即一个固定的与服务器进行通信的客户端应用程序提前知道的地址。
+
+# 通用 socket 地址结构
+
+不同的 socket domain 使用不同的地址结构，对于各种 socket domain 都需要定义一个不同的结构类型来存储 socket 地址，但是 `bind()` 之类的系统调用适用于所有的 socket domain，因此它们必须要能够接受任意类型的地址结构。因而定义了一个通用的地址结构 `socket sockaddr`。这个类型的唯一用途是将各种 domain 特定的地址结构转换成单个类型以供 socket 系统调用使用。
+
+```
+struct sockaddr {  
+    sa_family_t sin_family;		// 地址族
+    char sa_data[14]; 			/ /14字节，包含套接字中的目标地址和端口信息               
+}; 
+```
+
+这个结构是所有 domain 特定的地址结构的模板。
+
+# 流 socket
+
+![](./img/stream_socket.png)
+
+通过一个流 socket 通信类似于一个电话通信：
+
+- `socket()` 将会创建一个 scoket，等价于安装一个电话，为使得两个应用程序能够通信，每个应用程序都必须要创建一个 socket
+- 两个应用程序在相互通信之前必须相互连接：
+  - 一个应用程序调用 `bind()` 将 socket 绑定到一个重所周知的地址上，然后调用 `listen()` 通知内核它愿意接受连接
+  - 其他应用程序通过调用 `connect()` 建立连接，通知指定需连接的 socket 地址，这个过程类似于电话拨号
+  - 调用 `listen()` 的应用程序使用 `accept()` 接受连接，类似于电话响起并接听
+- 一旦建立了一个连接之后就可以在应用程序之间进行双向数据传输，直到其中一端使用 `close()` 关闭连接为止，通信可以使用 `read()/write()` 或者 `recv()/send()`
+
+主动和被动 socket：
+
+流 socket 通常可以分为主动和被动两种：
+
+- 默认情况下，使用 `socket()` 创建的 socket 是主动的，一个主动 socket 可用 `connect()` 调用中来建立一个到一个被动 socket 的连接。这种行为被称为执行一个主动的打开
+- 一个被动 socket，也称为监听 socket 是一个通过调用 `listen()` 以被标记成允许接入连接的 socket，接受一个接入连接通常被称为执行一个被动的打开
+
+在大多数使用流 socket 的应用程序中，服务器会执行被动式打开，客户端执行主动式打开。
+
+## 监听接入连接
+
+```
+#include <sys/types.h>
+#include <sys/socket.h>
+
+int listen(int sockfd, int backlog);
+```
+
+- `listen()` 系统调用将文件描述符 `sockfd` 引用的流 socket 标记为被动，这个 socket 后面会被用来接受来自其他 socket 的连接
+- 无法在一个已连接的 socket 即已经成功执行 `connect()` 的 socket 和 `accept()` 调用返回的 socket 上执行 `listen()`
+- 客户端可能会在服务器调用 `accept()` 之前调用 `connect()`，如果服务器可能正忙于处理其他客户端，这将产生一个未决连接，内核必须记录所有未决连接请求的相关信息，这样后续的 `accept()` 就能够处理这些请求：
+
+![](./img/undetermine_connect.png)
+
+- `backlog` 限制了未决连接的数量，在这个限制之内的连接请求会立即成功，之外的连接请求就会阻塞直到一个未决连接被 `accept()` 并从未决连接队列中删除为止，Linux 下特有的 `/proc/sys/net/core/somaxconn` 文件用来调整这个限制
+
+## 接受连接
+
+```
+#include <sys/types.h>
+#include <sys/socket.h>
+
+int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+```
+
+- `accept()` 系统调用在文件描述符 `sockfd` 引用的监听流 socket 上接受一个接入连接，如果在调用 `accept()` 时不存在未决连接，那么调用就会阻塞直到有连接请求到达为止
+- `accept()` 会创建一个新 socket，并且正是这个新 socket 会与执行  `connect()` 对等 socket 进行连接，其返回的结果是已连接的 socket 的文件描述符
+- 传入 `accept()` 的剩余参数会返回对端 socket 的地址，`addr` 返回相应的地址结构
+- `addrlen` 是一个值-结果参数，它指向一个整数，在调用被执行前必须将这个值初始化为 `addr` 指向的缓冲区大小，这样内核就知道有多少空间可以用于返回  socket 地址，当 `accept()` 返回之后，这个整数会被设置成实际被复制进缓冲区中的数据的字节数
+- 如果不关心对等 socket 地址，那么可以将 `addr` 和 `addrlen` 指定为 `NULL` 和 0
+
+## 连接到对等 socket
+
+```
+#include <sys/types.h>  
+#include <sys/socket.h>
+
+int connect(int sockfd, const struct sockaddr *addr,socklen_t addrlen);
+```
+
+- `connect()` 将文件描述符 `sockfd` 引用的主动 socket 连接到地址通过 `addr` 和 `addrlen` 指定的监听 socket
+- 如果 `connect()` 失败并且希望重新连接，SUSV3 规定完成这个任务的可移植方法是关闭这个 socket，创建一个新 socket，在该新 socket 上重新进行连接
+
+## 流 socket IO
+
+
+
+  
+
+# 数据报 socker
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
