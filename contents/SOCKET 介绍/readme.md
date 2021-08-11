@@ -209,8 +209,13 @@ Linux 上可以使用 `sendto()` 发送长度为 0 的数据报，但不是所�
 当一个数据报 socket 已连接之后：
 
 -  数据报的发送可在 socket 上使用 `write()` 和 `send()` 来完成并且会自动发送到同样的对等 socket上。与 `sendto()` 一样，每个 `write()` 发送一个独立的数据报
+-  在这个 socket 上只能读取由对等 socket 发送的数据报
 
+通过再发起一个  `connect()` 调用可以修改一个已连接的数据报 socket 的对等 socket，此外，通过指定一个地址族为 `AF_UNSPEC` 的地址结构还可以接触对等关联关系。但需要注意的是，其他很多 UNIX 实现并不支持将 `AF_UNSPEC` 用于这种用途。
 
+为一个数据报 socket 设置一个对等 socket，这种做法的明显优势是在该 socket 上传输数据时可以使用更简单的 IO 系统调用，即无需使用指定了 `dest_addr` 和 `addrlen` 参数的 `sendto()`，而只需要使用 `write()` 即可。设置一个对等 socket 主要对那些需要向单个对等 socket 发送多个数据报的应用程序是比较有用的。
+
+在一些 TCP/IP 实践上，将一个数据报 socket 连接到一个对等 socket 能够带来性能上的提升，在 Linux 上，连接一个数据报 socket 能对性能产生些许差异。
 
 
 
