@@ -1,5 +1,5 @@
 CC = gcc
-Targets = pty_master_open pty_fork
+Targets = pty_master_open pty_fork script pty_master_open_bsd
 
 
 all : $(Targets) 
@@ -13,6 +13,13 @@ pty_master_open:
 
 pty_fork:
 	$(CC) $(CFLAGS) -fPIC -shared -o libptyfork.so pty_fork.c -L. -lptymasteropen
+
+script:
+	$(CC) $(CFLAGS) -o script script.c -L. -lptymasteropen -lptyfork -lttyfunctions
+
+pty_master_open_bsd:
+	$(CC) $(CFLAGS) -fPIC -shared -o libptymasteropenbsd.so pty_master_open_bsd.c
+
 
 clean:
 	-rm -rf $(Targets)
