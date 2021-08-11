@@ -1,0 +1,67 @@
+POSIX_OPENPT(3)                                                                                     Linux Programmer's Manual                                                                                    POSIX_OPENPT(3)
+
+NNAAMMEE
+       posix_openpt - open a pseudoterminal device
+
+SSYYNNOOPPSSIISS
+       ##iinncclluuddee <<ssttddlliibb..hh>>
+       ##iinncclluuddee <<ffccnnttll..hh>>
+
+       iinntt ppoossiixx__ooppeennpptt((iinntt _f_l_a_g_s));;
+
+   Feature Test Macro Requirements for glibc (see ffeeaattuurree__tteesstt__mmaaccrrooss(7)):
+
+       ppoossiixx__ooppeennpptt(): _XOPEN_SOURCE >= 600
+
+DDEESSCCRRIIPPTTIIOONN
+       The ppoossiixx__ooppeennpptt() function opens an unused pseudoterminal master device, returning a file descriptor that can be used to refer to that device.
+
+       The _f_l_a_g_s argument is a bit mask that ORs together zero or more of the following flags:
+
+       OO__RRDDWWRR Open the device for both reading and writing.  It is usual to specify this flag.
+
+       OO__NNOOCCTTTTYY
+              Do not make this device the controlling terminal for the process.
+
+RREETTUURRNN VVAALLUUEE
+       On success, ppoossiixx__ooppeennpptt() returns a nonnegative file descriptor which is the lowest numbered unused descriptor.  On failure, -1 is returned, and _e_r_r_n_o is set to indicate the error.
+
+EERRRROORRSS
+       See ooppeenn(2).
+
+VVEERRSSIIOONNSS
+       Glibc support for ppoossiixx__ooppeennpptt() has been provided since version 2.2.1.
+
+AATTTTRRIIBBUUTTEESS
+       For an explanation of the terms used in this section, see aattttrriibbuutteess(7).
+
+       ┌───────────────┬───────────────┬─────────┐
+       │IInntteerrffaaccee      │ AAttttrriibbuuttee     │ VVaalluuee   │
+       ├───────────────┼───────────────┼─────────┤
+       │ppoossiixx__ooppeennpptt() │ Thread safety │ MT-Safe │
+       └───────────────┴───────────────┴─────────┘
+CCOONNFFOORRMMIINNGG TTOO
+       POSIX.1-2001, POSIX.1-2008.
+
+       ppoossiixx__ooppeennpptt() is part of the UNIX 98 pseudoterminal support (see ppttss(4)).
+
+NNOOTTEESS
+       Some older UNIX implementations that support System V (aka UNIX 98) pseudoterminals don't have this function, but it is easy to implement:
+
+           int
+           posix_openpt(int flags)
+           {
+               return open("/dev/ptmx", flags);
+           }
+
+       Calling  ppoossiixx__ooppeennpptt()  creates  a pathname for the corresponding pseudoterminal slave device.  The pathname of the slave device can be obtained using ppttssnnaammee(3).  The slave device pathname exists only as long as the
+       master device is open.
+
+SSEEEE AALLSSOO
+       ooppeenn(2), ggeettpptt(3), ggrraannttpptt(3), ppttssnnaammee(3), uunnlloocckkpptt(3), ppttss(4), ppttyy(7)
+
+CCOOLLOOPPHHOONN
+       This  page  is  part  of  release  4.04  of  the  Linux  _m_a_n_-_p_a_g_e_s  project.   A  description  of  the  project,  information  about  reporting  bugs,  and  the  latest  version  of  this  page,  can   be   found   at
+       http://www.kernel.org/doc/man-pages/.
+
+                                                                                                           2015-08-08                                                                                            POSIX_OPENPT(3)
