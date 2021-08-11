@@ -345,13 +345,28 @@ if(tcsetattr(fd,TCSAFLUSH,&tp) == -1)
 
 # 终端的行控制
 
+```
+#include <termios.h>
+#include <unistd.h>
 
+int tcsendbreak(int fd, int duration);
+int tcdrain(int fd);
+int tcflush(int fd, int queue_selector);
+int tcflow(int fd, int action);
+```
 
+- 这些函数都是 POSIX 创建的，被用来取代各种 `ioctl()` 操作
+- `fd` 表示文件描述符，它指向终端或者串行线上的其他远程设备
+- `tcsendbreak()` 通过传输连续的 0 比特流产生一个`BREAK` 状态，`duration` 指定了传输的持续时间，如果为0，则将持续 0.25秒，如果大于0，则时间持续 `duration` 个毫秒
+- `tcflush()` 刷新(丢弃)终端输入队列，终端输出队列或者两者中的数据，刷新输入队列将丢弃已经由终端驱动程序接收但还没有被任何进程读取的数据，刷新输出队列将丢弃已经传递给终端驱动程序但还没有传递给设备的数据，`queue_selector` 参数的取值：
 
+![](./img/queue_selector.png)
 
+- `tcflow()` 控制着数据在计算机和终端(或者其他的远程设备)之间的数据流方向，`action` 参数的取值：
 
+![](./img/action.png)
 
-
+# 终端窗口的大小
 
 
 
