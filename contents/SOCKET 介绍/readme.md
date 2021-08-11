@@ -161,11 +161,54 @@ int connect(int sockfd, const struct sockaddr *addr,socklen_t addrlen);
 
 ## 流 socket IO
 
+一对连接的流 socket 在两个端点之间提供了一个双向通信信道。
 
+![](./img/stream_socket_io.png)
 
-  
+- 要执行 IO 需要使用 `read()` 和 `write()` 系统调用，或者 `recv()` 和 `send()`
+- 一个 socket 可以使用 `close()` 关闭或在应用程序终止之后关闭，之后当对等应用程序试图从连接的另一端读取数据时将会收到文件结束，如果对等应用程序试图向其 socket 写入数据，那么它就会收到 `SIGPIPE` 信号，并且系统调用会返回 `EPIPE` 错误
 
-# 数据报 socker
+## 连接终止
+
+终止一个流 socket 连接的常见方式是调用 `close()`。如果多个文件描述符引用了同一个 socket，那么当所有描述符被关闭后连接就会终止。
+
+# 数据报 socket
+
+![](./img/dgram_socket.png)
+
+数据报 socket 的运作类似于邮政系统：
+
+- `socket()` 等价于创建一个邮箱，所有需要发送和接收数据报的应用程序都需要使用 `socket()` 创建一个数据报 socket
+- 为允许另一个应用程序发送其数据报，一个应用程序需要使用 `bind()` 将其 socket 绑定到一个众所周知的地址上
+- 要发送一个数据报，一个应用程序需要调用 `sendto()`，它接收的其中一个参数是数据报发送到的 socket 的地址
+- 为接收一个数据报，一个应用程序需要调用 `recvfrom()` ，它在没有数据报到达时将会阻塞
+- 当不需要 socket 时，应用程序需要使用 `close()` 关闭 socket
+
+## 交换数据报
+
+```
+#include <sys/types.h>
+#include <sys/socket.h>
+
+ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,struct sockaddr *src_addr, socklen_t *addrlen);
+ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
+```
+
+- `recvfrom()` 和 `sendto()` 在数据报 socket 上接收和发送数据
+- `flags` 是一个位掩码，控制着 socket 特定的 IO 特性
+- `src_addr` 和 `addrlen` 用来获取或指定与之通信的对等 socket 的地址，如果不关心可以设置为 `NULL` 和 0
+- 不管 `length` 的参数值是多少， `recvfrom()` 只会从一个数据报 socket 中读取一条消息，如果消息的长度超过了 `length`，那么消息将会静默被截断为 `length` 字节
+- `dest_addr` 和 `addrlen` 指定数据报发送到的 socket
+
+Linux 上可以使用 `sendto()` 发送长度为 0 的数据报，但不是所有的 UNIX 实现都是如此。
+
+## 在数据报 socket 上使用 `connect()`
+
+尽管数据报 socket 是无连接的，但是在数据报 socket 上应用 `connect()` 调用仍然起作用，这将导致内核记录这个 socket 的对等 socket 的地址。已连接的数据报 socket 就是此种类型。非连接的数据报 socket 指的就是没有调用 `connect()`  的 数据报 socket，这也是默认行为。
+
+当一个数据报 socket 已连接之后：
+
+-  数据报的发送可在 socket 上使用 `write()` 和 `send()` 来完成并且会自动发送到同样的对等 socket上。与 `sendto()` 一样，每个 `write()` 发送一个独立的数据报
 
 
 
