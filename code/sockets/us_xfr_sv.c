@@ -22,7 +22,7 @@ int main(int argc,char* argv[])
     if(sfd == -1)
         errExit("socket()");
     
-    if(remove(SV_SOCK_PATH) == -1 && errno != ENOENT)
+    if(remove(SV_SOCK_PATH) == -1 && errno != ENOENT)  //@ 移除所有的既有文件
         errExit("remove()");
     
     memset(&addr,0,sizeof(struct sockaddr_un));

@@ -42,11 +42,194 @@ if(bind(sfd,(struct sockaddr*)&addr,sizeof(struct sockaddr_un)) == -1)
 
 # UNIX domain 中的流 socket
 
+`server`：
+
+```
+int main(int argc,char* argv[])
+{
+    struct sockaddr_un addr;
+    int sfd,cfd;
+    ssize_t numRead;
+    char buf[BUFSIZ];
 
 
+    sfd = socket(AF_UNIX,SOCK_STREAM,0);	//@ 创建一个 socket
+    if(sfd == -1)
+        errExit("socket()");
+    
+    if(remove(SV_SOCK_PATH) == -1 && errno != ENOENT)  //@ 移除所有的既有文件
+        errExit("remove()");
+    
+    //@ 创建地址结构
+    memset(&addr,0,sizeof(struct sockaddr_un));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path,SV_SOCK_PATH,sizeof(addr.sun_path)-1);
+    if(bind(sfd,(struct sockaddr*)&addr,sizeof(struct sockaddr_un)) == -1)
+        errExit("bind()");
 
+    if(listen(sfd,BACKLOG) == -1)
+        errExit("listen()");
 
-# UNIX domain 中的流数据报socket
+	//@ 执行一个无限循环
+    for(;;)
+    {   
+        cfd = accept(sfd,NULL,NULL);  //@ 接受一个连接
+        if(cfd == -1)
+            errExit("accept()");
+        
+        while((numRead = read(cfd,buf,BUFSIZ)) > 0) //@ 读取数据
+        {
+            if(write(STDOUT_FILENO,buf,numRead) != numRead) //@  写入数据
+                errExit("write()");
+        }
+
+        if(numRead == -1)
+             errExit("read()");
+
+        if(close(cfd) == -1)	//@ 关闭连接
+             errExit("close()");
+    }
+}
+```
+
+`client`
+
+```
+int main(int argc,char* argv[])
+{
+    struct sockaddr_un addr;
+    int sfd;
+    ssize_t numRead;
+    char buf[BUFSIZ];
+
+    sfd = socket(AF_UNIX,SOCK_STREAM,0); //@ 创建一个 socket
+    if(sfd == -1)
+        errExit("socket()");
+    
+    //@ 创建地址结构
+    memset(&addr,0,sizeof(struct sockaddr_un));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path,SV_SOCK_PATH,sizeof(addr.sun_path) - 1);
+
+	//@ 执行连接
+    if(connect(sfd,(struct sockaddr*)&addr,sizeof(struct sockaddr_un)) == -1)
+        errExit("connect()");
+    
+    while((numRead = read(STDIN_FILENO,buf,BUFSIZ)) > 0)
+    {
+        if(write(sfd,buf,numRead) != numRead)
+            errExit("write()");
+    }
+
+    if(numRead == -1)
+        errExit("read()");
+    
+    exit(EXIT_SUCCESS);
+}
+```
+
+# UNIX domain 中的流数据报 socket
+
+对于 UNIX domain socket 来讲，数据报的传输是在内核中发生的，并且也是可靠的。所有的消息都会按序传递并且不会发生重复。
+
+## UNIX domain 数据报 socket 能传输的数据报的最大大小
+
+在 Linux 上数据报的限制是通过 `SO_SNDBUF` socket 选项和各个 `/proc` 文件来控制的。
+
+但其他一些 UNIX 实现采用的限制值更小一些，如 2048 字节。
+
+`server`：
+
+```
+int main(int argc,char* argv[])
+{
+    struct sockaddr_un svaddr, claddr;
+    int sfd, j;
+    ssize_t numBytes;
+    socklen_t len;
+    char buf[BUF_SIZE];
+
+    sfd = socket(AF_UNIX,SOCK_DGRAM,0);
+    if(sfd == -1)
+        errExit("socket()");
+    
+    if(remove(SV_SOCKET_PATH) == -1 && errno != ENOENT)
+        errExit("remove()");
+
+    memset(&svaddr,0,sizeof(struct sockaddr_un));
+    svaddr.sun_family = AF_UNIX;
+    strncpy(svaddr.sun_path,SV_SOCKET_PATH,sizeof(svaddr.sun_path)-1);
+
+    if(bind(sfd,(struct sockaddr*)&svaddr,sizeof(struct sockaddr_un)) == -1)
+        errExit("bind()");
+
+    for (;;)
+    {
+        len = sizeof(struct sockaddr_un);
+        numBytes = recvfrom(sfd,buf,BUF_SIZE,0,(struct sockaddr*)&claddr,&len);
+        if(numBytes == -1)
+            errExit("recvfrom()");
+        printf("server received %ld bytes from %s\n",(long)numBytes,claddr.sun_path);
+
+        for (j = 0; j < numBytes;j++)
+            buf[j] = toupper((unsigned char)buf[j]);
+        
+        if(sendto(sfd,buf,numBytes,0,(struct sockaddr*)&claddr,len) != numBytes)
+            errExit("sendto()");
+    }
+}
+
+```
+
+`client`
+
+```
+int main(int argc,char* argv[])
+{
+    struct sockaddr_un svaddr, claddr;
+    int sfd, j;
+    size_t msgLen;
+    ssize_t numBytes;
+    char resp[BUF_SIZE];
+
+    if(argc < 2 || strcmp(argv[1],"--help") == 0)
+    {
+        printf("%s msg ... \n",argv[0]);
+        exit(EXIT_SUCCESS);
+    }
+
+    sfd = socket(AF_UNIX,SOCK_DGRAM,0);
+    if(sfd == -1)
+        errExit("socket()");
+    
+    memset(&claddr,0,sizeof(struct sockaddr_un));
+    claddr.sun_family = AF_UNIX;
+    snprintf(claddr.sun_path,sizeof(claddr.sun_path),"/tmp/ud_ucase_cl.%ld",(long)getpid());
+
+    if(bind(sfd,(struct sockaddr*)&claddr,sizeof(struct sockaddr_un)) == -1)
+        errExit("bind()");
+
+    memset(&svaddr,0,sizeof(struct sockaddr_un));
+    svaddr.sun_family = AF_UNIX;
+    strncpy(svaddr.sun_path,SV_SOCKET_PATH,sizeof(svaddr.sun_path)-1);
+
+    for (j = 1; j < argc;j++)
+    {
+        msgLen = strlen(argv[j]);
+        if(sendto(sfd,argv[j],msgLen,0,(struct sockaddr*)&svaddr,sizeof(struct sockaddr_un)) != msgLen)
+            errExit("sendto()");
+
+        numBytes = recvfrom(sfd,resp,BUF_SIZE,0,NULL,NULL);
+        if(numBytes == -1)
+            errExit("recvfrom()");
+
+        printf("Response %d: %.*s\n",j,(int)numBytes,resp);
+    }
+
+    remove(claddr.sun_path);
+    exit(EXIT_SUCCESS);
+}
+```
 
 
 
