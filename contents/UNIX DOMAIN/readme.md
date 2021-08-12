@@ -231,19 +231,62 @@ int main(int argc,char* argv[])
 }
 ```
 
-
-
 # UNIX domain socket 权限
 
+socket 文件的所有权和权限决定了哪些进程能够与这个 socket 进行通信：
 
+- 要连接一个 UNIX domain 流 socket 需要在该 socket 文件上拥有写权限
+- 要通过一个 UNIX domain 流数据报 socket 发送一个数据报需要在该 socket 文件上拥有写权限
+
+此外，需要在存放 socket 路径名的所有目录上又有执行权限。
+
+在默认情况下，创建 socket 时会给所有者(用户)、组以及 other 用户 赋予所有的权限，要改变这种行为可以在调用 `bind()` 之前先调用 `umask()` 来禁用不希望赋予的权限。
 
 # 创建互联 socket 对
 
+有时候让当个进程创建一对 socket 并将它们连接起来是比较有用的。这可以通过使用两个 `socket()` 调用和一个 `bind()` 调用以及对 `listen()`、`connect()`、`accept()` 的调用或对 `connect()` 的调用来完成，`socketpair()` 则为这个操作提供了一个快捷方式：
 
+```
+#include <sys/types.h>
+#include <sys/socket.h>
 
+int socketpair(int domain, int type, int protocol, int sv[2]);
+```
 
+- `socketpair()` 只能用在 UNIX domain 中，即 `type` 必须是 `AF_UNIX`
+- `type` 可以被指定为 `SOCK_DGRAM` 或者 `SOCK_STREAM`
+- `protocol` 必须是 0
+- `sv` 返回引用了这两个相互连接的 socket 的文件描述符
+
+一般来说，socket 对的使用方式与管道的使用方式类似，在调用完 `socketpair()` 之后，进程会使用 `fork()` 创建一个子进程，子进程会继承父进程的文件描述符的副本，因此父子进程可以使用一对 socket 进行 IPC。
+
+使用 `socketpair()` 创建一对 socket  与手工创建一对相互连接的 socket 这两种做法之间的一个差别在于前一对 socket 不会绑定到任意地址上，因为这对 socket 对其他进程是不可见的。
 
 # Linux 抽象 socket 名空间
+
+所谓的抽象路径名空间是 Linux 特有的，它允许将一个 UNIX domain socket 绑定到一个名字上但不会在文件系统中创建该名字，其具备的优势：
+
+- 无需担心与文件系统中既有名字产生冲突
+- 没有必要在使用完 socket 之后删除 socket 路径名，当 socket 被关闭后会自动删除这个抽象名
+- 无需为 socket 创建一个文件系统路径名，这对于 chroot 环境以及在不具备文件系统写权限时是比较有用的
+
+要创建一个抽象绑定就需要将 `sun_path` 字段的第一个字节指定为 `NULL` 即 `\0`。
+
+```
+struct sockaddr_un addr;
+
+memset(&addr,0,sizeof(struct sockaddr_un));
+addr.sun_family = AF_UNIX;
+
+strncpy(&addr.sun_path[1],"xyz",sizeof(addr.sun_path)-2);
+
+sockfd = socket(AF_UNIX,SOCK_STREAM,0);
+if(sockfd == -1)
+	errExit("socket()");
+	
+if(bind(sockfd,(struct sockaddr*)&addr,sizeof(struct sockaddr_un)) == -1)
+	errExit("bind()");
+```
 
 
 
