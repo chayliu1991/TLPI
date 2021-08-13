@@ -140,6 +140,39 @@ struct sockaddr_storage{
 
 # 主机和服务转换函数概述
 
+主机名和连接在网络上的一个系统的符号标识符，服务名是端口号的符号表示。主机地址和端口的表示有下列两种：
+
+主机地址和端口的表示有两种方法：
+
+- 主机地址可以表示为一个二进制值或一个符号主机名或展现格式(IPv4 点分十进制，IPv6 是十六进制字符串)
+- 端口号可以表示为一个二进制值或一个符号服务名
+
+# `inet_pton()` 和 `inet_ntop()` 函数
+
+```
+#include <arpa/inet.h>
+
+int inet_pton(int af, const char *src, void *dst);
+const char *inet_ntop(int af, const void *src,char *dst, socklen_t size);
+```
+
+- `p` 表示展现 `presentation` ，`n` 表示 网络 `network`
+- `inet_pton()` 将 `src` 包含的展现字符串转换成网络字节序的二进制 IP 地址，`af`  被指定为 `AF_INET`  或者  `AF_INET6`
+-  `inet_ntop()` 执行逆向转换， `size`  被指定为缓冲器的大小，如果 `size` 太小，那么 `inet_ntop()` 会返回 `NULL` 并将 `errno` 设置成 `ENOSPC`
+
+缓冲器大小可以使用下面两个宏指定：
+
+```
+#include <netinet/in.h>
+
+#define INET_ADDRSTRLEN		 16
+#define INET6_ADDRSTRLEN	 46
+```
+
+# 数据报 socket 客户端/服务器示例
+
+
+
 
 
 
