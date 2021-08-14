@@ -1,5 +1,5 @@
 CC = gcc
-Targets = us_xfr_sv us_xfr_cl ud_ucase_sv ud_ucase_cl read_line i6d_ucase_sv i6d_ucase_cl is_seqnum_sv is_seqnum_cl inet_sockets
+Targets = us_xfr_sv us_xfr_cl ud_ucase_sv ud_ucase_cl read_line i6d_ucase_sv i6d_ucase_cl is_seqnum_sv is_seqnum_cl inet_sockets t_gethostbyname
 
 all : $(Targets)
 
@@ -34,6 +34,10 @@ is_seqnum_sv:
 inet_sockets:
 	$(CC) $(CFLAGS) -shared -fPIC -o libinetsockets.so inet_sockets.c
 	mv libinetsockets.so ../libs
+
+t_gethostbyname:
+	$(CC) $(CFLAGS) -o t_gethostbyname t_gethostbyname.c
+
 
 clean:
 	-rm -rf $(Targets)

@@ -8,7 +8,7 @@
 #include <netdb.h>
 #include <errno.h>
 #include <string.h>
-<stdio.h>
+#include <stdio.h>
 
 
 int inetConnect(const char *host, const char *service, int type)

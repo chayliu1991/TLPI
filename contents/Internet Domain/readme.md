@@ -576,83 +576,223 @@ int main(int argc,char* argv[])
 }
 ```
 
+# Internet domain socket 库
+
+```
+int inetConnect(const char *host, const char *service, int type)
+{
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
+    int sfd, s;
+
+    memset(&hints,0,sizeof(struct addrinfo));
+    hints.ai_canonname = NULL;
+    hints.ai_addr = NULL;
+    hints.ai_next = NULL;
+    hints.ai_socktype = type;
+    hints.ai_family = AF_UNSPEC;
+
+    s = getaddrinfo(host, service, &hints, &result);
+    if(s != 0)
+    {
+        errno = ENOSYS;
+        return -1;
+    }
+    
+    for (rp = result; rp != NULL;rp = rp->ai_next)
+    {
+        sfd = socket(rp->ai_family,rp->ai_socktype,rp->ai_protocol);
+        if(sfd == -1)
+            continue;
+          
+        if(connect(sfd,rp->ai_addr,rp->ai_addrlen) != -1)
+            break;
+
+        close(sfd);    
+    }
+
+    freeaddrinfo(result);
+
+    return rp == NULL ? -1 : sfd;
+}
+
+static int inetPassiveSocket(const char* service,int type,socklen_t* addrLen,Boolean doListen,int backlog)
+{
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
+    int sfd, s, optval;
+
+    memset(&hints,0,sizeof(struct addrinfo));
+    hints.ai_canonname = NULL;
+    hints.ai_addr = NULL;
+    hints.ai_next = NULL;
+    hints.ai_socktype = type;
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_flags = AI_PASSIVE;
+
+    s = getaddrinfo(NULL, service, &hints, &result);
+    if(s != 0)
+    {
+        return -1;
+    }
+
+    optval = 1;
+
+    for (rp = result; rp != NULL;rp = rp->ai_next)
+    {
+        sfd = socket(rp->ai_family,rp->ai_socktype,rp->ai_protocol);
+        if(sfd == -1)
+            continue;
+        
+        if(doListen)
+        {
+            if(setsockopt(sfd,SOL_SOCKET,SO_REUSEADDR,&optval,sizeof(optval)) == -1)
+            {
+                close(sfd);
+                freeaddrinfo(result);
+                return -1;
+            }
+        }
+
+        if(bind(sfd,rp->ai_addr,rp->ai_addrlen) ==0)
+            break;
+        close(sfd);    
+    }
+
+    if(rp != NULL && addrLen != NULL)
+    {
+        *addrLen = rp->ai_addrlen;
+    }
+    freeaddrinfo(result);
+    return rp == NULL ? -1 : sfd;
+}
+
+
+int inetListen(const char *service, int backlog, socklen_t *addrlen)
+{
+    return inetPassiveSocket(service,SOCK_STREAM,addrlen,True,backlog);
+}
+
+int inetBind(const char *service, int type, socklen_t *addrlen)
+{
+    return inetPassiveSocket(service,type,addrlen,False,0);
+}
+
+char *inetAddressStr(const struct sockaddr *addr, socklen_t addrLen, char *addrStr, int addrStrLen)
+{
+    char host[NI_MAXHOST], service[NI_MAXSERV];
+    if(getnameinfo(addr,addrLen,host,NI_MAXHOST,service,NI_MAXSERV,NI_NUMERICSERV) == 0)
+        snprintf(addrStr,addrStrLen,("%s,%s"),host,service);
+    else
+        snprintf(addrStr,addrStrLen,"?UNKNOWN?");
+
+    addrStr[addrLen - 1] = '\0';
+    return addrStr;
+}
+```
 
+# 过时的主机和服务转换 API
 
+## `inet_aton()` 和 `inet_ntoa()` 
 
+```
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
+int inet_aton(const char *str, struct in_addr *addr);
+```
 
+- `inet_aton()` 将 `str` 指向的点分十进制字符串转换成一个网络字节序的 IPv4 地址，转换得到的地址将会返回 `addr` 指向的结构
+- 成功时返回 1，`str` 无效时返回 0
+- `str` 字符串的数值部分无需是十进制的，它可以是八进制的，也可以是十六进制的
 
+```
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
+char *inet_ntoa(struct in_addr in);
+```
 
+- `inet_ntoa()` 返回一个指向包含用点分十进制标记法标记的地址的字符串指针
+- `inet_ntoa()` 返回的字符串是静态分配的，因此会被后续调用所覆盖
 
+## `gethostbyname()` 和 `gethostbyaddr()` 
 
+```
+#include <netdb.h>
+extern int h_errno;
 
+struct hostent *gethostbyname(const char *name);
+struct hostent *gethostbyaddr(const void *addr,socklen_t len, int type);
+```
 
+- `gethostbyname()` 解析由 `name`  给出的主机名，并返回一个指向静态分配的包含了主机名相关信息的 `hostent` 结构的指针
+- `gethostbyaddr()` 执行 `gethostbyname()` 的逆操作，给定一个二进制 IP 地址，它会返回一个包含与配置了该地址的主机相关的信息的 `hostent` 结构
+- 发生错误时，或者无法解析一个名字时，`gethostbyname()` 和 `gethostbyaddr()` 都会返回 `NULL`，并设置全局变量 `h_errno`。这个变量类似于 `errno`，`herror()` 和  `hstrerror()` 类似于  `perror()` 和 `strerror()`
 
+```
+#include <netdb.h>
+extern int h_errno;
 
+void herror(const char *s);
+const char *hstrerror(int err);
+```
 
+- `hostent` 结构：
 
+```
+struct hostent {
+    char  *h_name;            /* official name of host */
+    char **h_aliases;         /* alias list */
+    int    h_addrtype;        /* host address type */
+    int    h_length;          /* length of address */
+    char **h_addr_list;       /* list of addresses */
+}
+#define h_addr h_addr_list[0] /* for backward compatibility */
+```
 
+- `h_name` 返回主机的官方名字，是一个以 `null` 结尾的字符串
+- `h_aliases` 指向一个指针数组，数组中的指针指向以 `null` 结尾的包含了主机名的别名的字符串
+- `h_addr_list` 是一个指针数组，数组中的指针指向这个主机的 IP 地址结构，这个列表由 `in_addr` 和 `in6_addr`  结构构成，通过 `h_addrtype` 字段可以确定这些结构的类型，其取值为 `AF_INET` 或 `AF_INET6`，`h_length` 字段可以确定这些结构的长度
 
+## `getservbyname()` 和 `getservbyport()`
 
+```
+#include <netdb.h>
 
+struct servent *getservbyname(const char *name, const char *proto);
+```
 
+- `getservbyname()` 和 `getservbyport()` 都是从 `/etc/services`  文件中获取记录，现在已经被 `getaddrinfo()`  和 `getnameinfo()`  取代
+- `getservbyname()` 查询服务名或者其中一个别名与  `name` 匹配以及协议与 `proto` 匹配的记录，`proto` 可以是 TCP 或者 UDP，或者设置为 `NULL`
+-  如果找到了一个匹配的记录，那么 `getservbyname()` 会返回一个指向静态分配的结构指针：
 
+```
+struct servent {
+    char  *s_name;       /* official service name */
+    char **s_aliases;    /* alias list */
+    int    s_port;       /* port number */
+    char  *s_proto;      /* protocol to use */
+};
+```
 
+- 一般调用 `getservbyname()` 只是为了获取端口号，即 `s_port` 字段
 
+```
+#include <netdb.h>
 
+struct servent *getservbyport(int port, const char *proto);
+```
 
+- `getservbyport()` 执行  `getservbyname()` 的逆操作，它返回一个  `servent` 记录，该记录包含了 `/etc/services` 文件中端口号与 `port` 匹配的记录相关的信息
 
+# UNIX 与 Internet domain socket 比较
 
+编写只使用 Internet domain socket 的应用程序即可以运行在同一主机上，也可以运行在网络中的不同主机上。
 
+UNIX domain socket 只能用于同一系统上的应用程序间通信，使用 UNIX domain socket 的几个原因：
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+- 在一些实现上，UNIX domain socket 速度要比 Internet domain socket 快
+- 可以使用目录权限来控制对 UNIX domain socket 的访问，这样只有运行于指定的用户或组 ID 下的应用程序才能够连接到一个监听流 socket 或向一个数据报 socket 发送一个数据报
