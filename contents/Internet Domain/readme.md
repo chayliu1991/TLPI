@@ -171,6 +171,124 @@ const char *inet_ntop(int af, const void *src,char *dst, socklen_t size);
 
 # 数据报 socket 客户端/服务器示例
 
+`server`
+
+```
+int main(int argc,char* argv[])
+{
+    struct sockaddr_in6 svaddr, claddr;
+    int sfd, j;
+    ssize_t numBytes;
+    socklen_t len;
+    char buf[BUF_SIZE];
+    char claddrStr[INET_ADDRSTRLEN];
+
+    sfd = socket(AF_INET6,SOCK_DGRAM,0);
+    if(sfd ==-1)
+        errExit("socket()");
+
+    memset(&svaddr,0,sizeof(struct sockaddr_in6));
+    svaddr.sin6_family = AF_INET6;
+    svaddr.sin6_addr = in6addr_any;
+    svaddr.sin6_port = htons(PROT_NUM);
+
+    if(bind(sfd,(struct sockaddr_in6*)&svaddr,sizeof(struct sockaddr_in6)) == -1)
+        errExit("bind()");
+
+    for (;;)
+    {
+        len = sizeof(struct sockaddr_in6);
+        numBytes = recvfrom(sfd,buf,BUF_SIZE,0,(struct sockaddr*)&claddr,&len);
+        if(numBytes == -1)
+            errExit("recvfrom()");
+        if (inet_ntop(AF_INET6, &claddr.sin6_addr, claddrStr,INET6_ADDRSTRLEN) == NULL)
+            printf("could not convert client address to string\n");
+        else
+            printf("Sever received %ld bytes from (%s,%u)\n",(long)numBytes,claddr,ntohs(claddr.sin6_port));
+        
+        if(sendto(sfd,buf,numBytes,0,(struct sockaddr*)&claddr,len) != numBytes)
+            errExit("sendto()");
+    }
+}
+```
+
+`client`
+
+```
+int main(int argc,char* argv[])
+{
+    struct sockaddr_in6 svaddr, claddr;
+    int sfd, j;
+    size_t msgLen;
+    ssize_t numBytes;
+    char resp[BUF_SIZE];
+
+    if(argc < 3 | strcmp(argv[1],"--help") == 0)
+    {
+        printf("%s host-address msg...",argv[0]);
+        exit(EXIT_SUCCESS);
+    }
+
+    sfd = socket(AF_INET6,SOCK_DGRAM,0);
+    if(sfd ==-1)
+        errExit("socket()");
+
+    memset(&svaddr,0,sizeof(struct sockaddr_in6));
+    svaddr.sin6_family = AF_INET6;
+    svaddr.sin6_port = htons(PROT_NUM);
+    if(inet_pton(AF_INET6,argv[1],&svaddr.sin6_addr) <= 0)
+        errExit("inet_pton()");
+
+    for (j = 2; j < argc;j++)
+    {
+        msgLen = strlen(argv[j]);
+        if (sendto(sfd,argv[j],msgLen,0,(struct sockaddr*)&svaddr,sizeof(struct sockaddr_in6)) != msgLen)
+            errExit("sendto()");
+
+        numBytes = recvfrom(sfd,resp,BUF_SIZE,0,NULL,NULL);
+        if(numBytes == -1)
+            errExit("recvfrom()");
+
+        printf("Respone %d : %.*s\n",j-1,(int)numBytes,resp);
+    }
+
+    exit(EXIT_SUCCESS);
+}
+```
+
+# 域名系统(DNS)
+
+DNS 出现以前，主机名和 IP 地址之间的映射关系是在一个手工维护的本地文件 `/etc/hosts`  中进行定义的：
+
+```
+127.0.0.1       localhost
+::1     ip6-localhost ip6-loopback
+```
+
+`gethostbyname()` 或者 `getaddrinfo()` 通过搜索这个文件并找出与规范主机名或其中一个别名匹配的记录来获取一个 IP 地址。
+
+DNS 设计：
+
+![](./img/dns.png)
+
+- 将主机名组织在一个层级名空间中，每个节点有一个标签，该标签最多能包含 63 个字符，层级的根是一个无名的节点，称为 "匿名节点"
+- 一个节点的域名由该节点到根节点的路径中所有节点的名字连接而成，各个名字之间使用 `.` 分隔
+- 完全限定域名，如 `www.kernel.org.` ，标识出了层级中的一台主机，区分一个完全限定域名的方法是看名字是否以`.`结尾，但是在很多情况下这个点会被省略
+- 没有一个组织或系统会管理整个层级，相反，存在一个 DNS 服务器层级，每台服务器管理树的一个分支(区域)
+- 当一个程序调用 `getaddrinfo()` 来解析一个域名时，`getaddrinfo()` 会使用一组库函数来与各地的 DNS 服务器通信，如果这个服务器无法提供所需要的信息，那么它就会与位于层级中的其他  DNS 服务器进行通信以便获取信息，这个过程可能花费很多时间，DNS 采用了缓存技术以节省时间
+
+## 递归和迭代的解析请求
+
+DNS 解析请求可以分为：递归和迭代。
+
+递归请求：请求者要求服务器处理整个解析任务，包括在必要时候与其它 DNS 服务器进行通信任务。当位于本地主机上的一个应用程序调用 `getaddrinfo()`  时，该函数会与本地 DNS 服务器发起一个递归请求，如果本地 DNS 服务器自己没有相关信息来完成解析，那么它就会迭代地解析这个域名。
+
+迭代解析：假设要解析 `www.otago.ac.nz`，首先与每个 DNS 服务器都知道的一小组根名字服务器中的一个进行通信，根名字服务器会告诉本 DNS 服务器到其中一台 `nz` DNS 服务器上查询，然后本地 DNS 服务器会在 `nz` 服务器上查询名字 `www.otago.ac.nz`，并收到一个到 `ac.nz` 服务器上查询的响应，之后本地 DNS 服务器会在 `ac.nz` 服务器上查询名字 `www.otago.ac.nz` 并告知查询 `otago.ac.nz` 服务器，最后本地 DNS 服务器会在 `otago.ac.nz` 服务器上查询 `www.otago.ac.nz` 并获取所需的 IP 地址。
+
+向  `gethostbyname()` 传递一个不完整的域名，那么解析器在解析之前会尝试补齐。域名补全规则在  `/etc/resolv.conf` 中定义，默认情况下，至少会使用本机的域名来补全，例如，登录机器 `oghma.otago.ac.nz` 并输入 `ssh octavo` 得到的 DNS 查询将会以 `octavo.otago.ac.nz` 作为其名字。
+
+
+
 
 
 

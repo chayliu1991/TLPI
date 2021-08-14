@@ -36,24 +36,12 @@ int main(int argc,char* argv[])
         if (sendto(sfd,argv[j],msgLen,0,(struct sockaddr*)&svaddr,sizeof(struct sockaddr_in6)) != msgLen)
             errExit("sendto()");
 
-        numBytes = recvfrom();
+        numBytes = recvfrom(sfd,resp,BUF_SIZE,0,NULL,NULL);
+        if(numBytes == -1)
+            errExit("recvfrom()");
+
+        printf("Respone %d : %.*s\n",j-1,(int)numBytes,resp);
     }
 
-    // if(bind(sfd,(struct sockaddr_in6*)&svaddr,sizeof(struct sockaddr_in6)) == -1)
-    //     errExit("bind()");
-
-    // for (;;)
-    // {
-    //     len = sizeof(struct sockaddr_in6);
-    //     numBytes = recvfrom(sfd,buf,BUF_SIZE,0,(struct sockaddr*)&claddr,&len);
-    //     if(numBytes == -1)
-    //         errExit("recvfrom()");
-    //     if (inet_ntop(AF_INET6, &claddr.sin6_addr, claddrStr,INET6_ADDRSTRLEN) == NULL)
-    //         printf("could not convert client address to string\n");
-    //     else
-    //         printf("Sever received %ld bytes from (%s,%u)\n",(long)numBytes,claddr,ntohs(claddr.sin6_port));
-        
-    //     if(sendto(sfd,buf,numBytes,0,(struct sockaddr*)&claddr,len) != numBytes)
-    //         errExit("sendto()");
-    // }
+    exit(EXIT_SUCCESS);
 }
