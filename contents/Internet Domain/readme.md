@@ -396,12 +396,27 @@ int getnameinfo(const struct sockaddr *addr, socklen_t addrlen,char *host, sockl
 ```
 
 - `addr` 指向待转换的 socket 地址结构，长度为 `addrlen`
-- 得到的主机和服务名是以 `null` 结尾的字符串，它们会被存储在 `host` 和 `service` 指向的缓冲器中，调用者必须要为这些缓冲器分配空间并将它们的大小传入  `hostlen` 和 `servlen` ，`NI_MAXHOST` 指出了返回的主机名字符串的最大字节数，其取值为 `1025`，`NI_MAXSERV` 指出了返回服务名字符串的最大字节数，其取值为 `32`
-- 如果不想获取主机名，可以将 `host` 指定为 `NULL` 并且将 `hostlen`  指定为 0，如果不想获取服务名，可以将 `service` 指定为 `NULL` 并且将 `servlen`  指定为 0，但是 `host` 和 `service` 中至少有一个必须非 `NULL`
-- `flags` 是一个掩码，控制着 `getnameinfo()` 的行为，取值为：
-  - 
 
- 
+- 得到的主机和服务名是以 `null` 结尾的字符串，它们会被存储在 `host` 和 `service` 指向的缓冲器中，调用者必须要为这些缓冲器分配空间并将它们的大小传入  `hostlen` 和 `servlen` ，`NI_MAXHOST` 指出了返回的主机名字符串的最大字节数，其取值为 `1025`，`NI_MAXSERV` 指出了返回服务名字符串的最大字节数，其取值为 `32`
+
+- 如果不想获取主机名，可以将 `host` 指定为 `NULL` 并且将 `hostlen`  指定为 0，如果不想获取服务名，可以将 `service` 指定为 `NULL` 并且将 `servlen`  指定为 0，但是 `host` 和 `service` 中至少有一个必须非 `NULL`
+
+- `flags` 是一个掩码，控制着 `getnameinfo()` 的行为，取值为：
+
+  - `NI_DGRAM`：默认情况下，`getnameinfo()`  返回 TCP 服务对应的名字，`NI_DGRAM` 标记强制返回 UDP 服务的名字
+
+  - `NI_NAMEREQD`：默认情况下，如果无法解析主机名，那么在 `host` 中返回一个数值地址字符串，如果指定了 `NI_NAMEREQD`，就会返回一个错误 `EAI_NONAME`
+
+  - `NI_NOFQDN`：在默认情况下会返回主机的完全限定域名，指定 `NI_NOFQDN` 标记会导致当主机位于局域网中时只返回名字的第一部分(即主机名)
+
+  - `NI_NUMERICHOST`：强制在 `host` 中返回一个数值地址字符串，这个标记在需要避免可能耗时较长的 DNS 服务器调用时是比较有用的
+
+  - `NI_NUMERICSERV`：强制在 `service` 中返回一个十进制端口号字符串，这个标记在知道端口号不对应于服务器名时，如它是一个由内核分配给 socket 的临时端口号，以及需要避免不必要的搜索 `/etc/service`  的低效性时是比较有用的
+
+
+# 流式 socket 客户端/服务器示例
+
+
 
 
 
