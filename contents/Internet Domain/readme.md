@@ -349,17 +349,59 @@ struct addrinfo {
 `hints.ai_flags` 字段是一个位掩码，它会改变 `getaddrinfo()` 的行为，取值为：
 
 - `AI_ADDRCONFIG`：在本地系统上至少配置一个 IPv4 地址时返回 IPv4 地址(不是 IPv4 回环地址)，在本地系统上至少配置一个 IPv6 地址时返回 IPv6 地址(不是 IPv6 回环地址)
-- `AI_ADDRCONFIG`：
-- `AI_ADDRCONFIG`：
-- `AI_ADDRCONFIG`：
-- `AI_ADDRCONFIG`：
-- `AI_ADDRCONFIG`：
+- `AI_ALL`：参见 `AI_V4MAPPED`
+- `AI_CANONNAME`：如果 `host` 不为 `NULL`，返回一个指向 `null` 结尾的字符串，该字符串包含了主机的规范名，这个指针会在通过 `result` 返回的第一个 `addrinfo` 结构中 `ai_canoname` 字段指向的缓冲器中返回
+- `AI_NUMERICHOST`：强制将 `host` 解释成一个数值地址字符串，这个常量用于在不必要解析名字时防止进行名字解析，因为名字解析可能会花费比较长的时间
+- `AI_NUMERICSERV`：将 `service` 解释成一个数值端口号，这个标记用于防止调用任意的名字解析服务，因为当  `service` 为一个数值字符串时这种调用是没有必要的
+- `AI_PASSIVE`：返回一个适合进行被动式打开(即一个监听 socket)的 socket 地址结构，此时，`host` 应该是 `NULL`，通过 `result` 返回的 socket 地址结构 IP 地址部分将会包含一耳光通配 IP 地址(`INADDR_ANY` 或者 `IN6ADDR_ANY_INIT`)。如果没有设置这个标记，那么通过 `res` 返回的地址结构中的 IP 地址将会被设置成回环 IP 地址(`INADDR_LOOPBACK` 或者 `IN6ADDR_LOOPBACK_INIT`)
+- `AI_V4MAPPED`：如果在 `hints` 的 `ai_family` 中指定了 `AF_INET6`，那么在没有找到匹配的 IPv6 地址时应该在 `res` 返回 IPv4 映射的 IPv6 地址。如果同时指定了`AI_ALL`  和 `AI_V4MAPPED`，那么 `res` 中同时返回 IPv6 和 IPv4 地址，IPv4 地址会被返回成 IPv4 映射的 IPv6 地址
 
+## 释放 `addrinfo` 列表 `freeaddrinfo()`
 
+```
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
+void freeaddrinfo(struct addrinfo *res);
+```
 
+-  `getaddrinfo()` 函数会动态地为 `res` 引用的所有结构分配内存，其结果是调用者必须要在不需要使用这些结构时释放它们，使用 `freeaddrinfo()` 来执行释放的任务
 
+## 错误诊断 `gai_strerror()`
 
+`getaddrinfo()` 在发生错误时返回下面的一个错误码：
+
+![](./img/EAI.png)
+
+```
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+
+const char *gai_strerror(int errcode);
+```
+
+- `gai_strerror()` 返回一个描述错误的字符串
+
+# `getnameinfo()` 函数
+
+`getnameinfo()`  是 `getaddrinfo()` 的逆函数。给定一个 socket 地址结构它会返回一个包含对应的主机和服务名的字符串或者无法解析名字时返回一个等价的数值。
+
+```
+#include <sys/socket.h>
+#include <netdb.h>
+
+int getnameinfo(const struct sockaddr *addr, socklen_t addrlen,char *host, socklen_t hostlen,char *service, socklen_t servlen, int flags);
+```
+
+- `addr` 指向待转换的 socket 地址结构，长度为 `addrlen`
+- 得到的主机和服务名是以 `null` 结尾的字符串，它们会被存储在 `host` 和 `service` 指向的缓冲器中，调用者必须要为这些缓冲器分配空间并将它们的大小传入  `hostlen` 和 `servlen` ，`NI_MAXHOST` 指出了返回的主机名字符串的最大字节数，其取值为 `1025`，`NI_MAXSERV` 指出了返回服务名字符串的最大字节数，其取值为 `32`
+- 如果不想获取主机名，可以将 `host` 指定为 `NULL` 并且将 `hostlen`  指定为 0，如果不想获取服务名，可以将 `service` 指定为 `NULL` 并且将 `servlen`  指定为 0，但是 `host` 和 `service` 中至少有一个必须非 `NULL`
+- `flags` 是一个掩码，控制着 `getnameinfo()` 的行为，取值为：
+  - 
+
+ 
 
 
 
