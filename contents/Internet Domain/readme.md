@@ -287,6 +287,94 @@ DNS 解析请求可以分为：递归和迭代。
 
 向  `gethostbyname()` 传递一个不完整的域名，那么解析器在解析之前会尝试补齐。域名补全规则在  `/etc/resolv.conf` 中定义，默认情况下，至少会使用本机的域名来补全，例如，登录机器 `oghma.otago.ac.nz` 并输入 `ssh octavo` 得到的 DNS 查询将会以 `octavo.otago.ac.nz` 作为其名字。
 
+## 顶级域
+
+紧跟在匿名根节点下面的节点称为顶级域(TLD)，TLD 分为两类：通用的和国家的。
+
+# `/etc/services` 文件
+
+端口号和服务名记录在 `/etc/services` 中，`getaddrinfo()` 和 `getnameinfo()` 会使用这个文件中的信息在服务名和端口号之间进行转换。
+
+# 独立于协议的主机和服务转换
+
+`getaddrinfo()` 将主机和服务名转换成 IP 地址和端口号，它作为过时的 `gethostbyname()` 和 `getservername()` 接替者。
+
+`getnameinfo()` 是 `getaddrinfo()` 的逆函数，将一个 socket 地址结构转换成包含对应主机和服务名的字符串，是过时的 `gethostbyaddr()` 和 `getserverbyport()` 的等价物。
+
+## `getaddrinfo()` 函数
+
+```
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+
+int getaddrinfo(const char *host, const char *service, const struct addrinfo *hints,struct addrinfo **res);
+```
+
+- 给定一个主机名和服务器名，`getaddrinfo()` 返回一个 `socket` 地址结构列表，每个结构都包含一个地址和端口号
+- 成功时返回0，失败时返回非 0
+- `host` 包含一个主机名或者一个以 IPv4 点分十进制标记或者 IPv6 十六进制字符串标记的数值地址字符串
+- `service` 包含一个服务名或一个十进制端口号
+- `hints` 指向一个 `addrinfo` 结构：
+
+```
+struct addrinfo {
+    int              ai_flags;
+    int              ai_family;
+    int              ai_socktype;
+    int              ai_protocol;
+    socklen_t        ai_addrlen;
+    struct sockaddr *ai_addr;
+    char            *ai_canonname;
+    struct addrinfo *ai_next;
+};
+```
+
+- `res` 返回一个结构列表而不是单个结构，因为与在 `host`、 `service`、 `hints`、 指定的标准对应的主机和服务组合可能有多个。例如，查询多个网络接口的主机时可能返回多个地址结构，此外，如果将 `hints.ai_sockettype` 指定 为0，那么可能返回两个结构：一个用于 `SOCK_DGRAM` socket 和 `SOCKET_STREAM` socket，前提是给定的 `service` 同时对 TCP 和 UDP 可用
+
+![](./img/getaddrinfo.png)
+
+
+
+### `hints` 参数
+
+`hints` 参数为如何选择 `getaddrinfo()` 返回的 socket 地址结构指定了更多标准。当用作 `hints`  参数时只能设置 `addrinfo` 结构的 `ai_flags`、`ai_family`、`ai_socktype`、`ai_protocol`  字段，其他字段未使用，并将根据具体情况初始化为 0 或者 `NULL`。
+
+`hints.ai_family` 返回的 socket 地址结构的域，取值可以是 `AF_INET` 或者 `AF_INET6`。如果需要获取所有种类 socket 地址，那么可以将这个字段设置为 `AF_UNSPEC`。
+
+`hints.ai_socktype` 字段指定了使用返回的 socket 地址结构的 socket 类型。如果将这个字段指定为 `SOCK_DGRAM`，那么查询将会在 UDP 服务上执行，如果指定了  `SOCK_STREAM`，那么将返回一个 TCP 服务查询，如果将其指定为 0，那么任意类型的 socket 都是可接受的。
+
+`hints.ai_protocol` 字段为返回的地址结构选择了 socket 协议，这个字段设置为 0，表示调用者接受任何协议。
+
+`hints.ai_flags` 字段是一个位掩码，它会改变 `getaddrinfo()` 的行为，取值为：
+
+- `AI_ADDRCONFIG`：在本地系统上至少配置一个 IPv4 地址时返回 IPv4 地址(不是 IPv4 回环地址)，在本地系统上至少配置一个 IPv6 地址时返回 IPv6 地址(不是 IPv6 回环地址)
+- `AI_ADDRCONFIG`：
+- `AI_ADDRCONFIG`：
+- `AI_ADDRCONFIG`：
+- `AI_ADDRCONFIG`：
+- `AI_ADDRCONFIG`：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
