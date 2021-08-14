@@ -1,5 +1,5 @@
 CC = gcc
-Targets = us_xfr_sv us_xfr_cl ud_ucase_sv ud_ucase_cl read_line i6d_ucase_sv i6d_ucase_cl is_seqnum_sv is_seqnum_cl
+Targets = us_xfr_sv us_xfr_cl ud_ucase_sv ud_ucase_cl read_line i6d_ucase_sv i6d_ucase_cl is_seqnum_sv is_seqnum_cl inet_sockets
 
 all : $(Targets)
 
@@ -30,6 +30,10 @@ is_seqnum_cl:
 
 is_seqnum_sv:
 	$(CC) $(CFLAGS) -o is_seqnum_sv is_seqnum_sv.c -L../libs -lreadline
+
+inet_sockets:
+	$(CC) $(CFLAGS) -shared -fPIC -o libinetsockets.so inet_sockets.c
+	mv libinetsockets.so ../libs
 
 clean:
 	-rm -rf $(Targets)
