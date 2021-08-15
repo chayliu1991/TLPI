@@ -7,6 +7,9 @@
 #include <fcntl.h>
 
 
+#include "become_daemon.h"
+
+
 #define BD_NO_CHDIR           01
 #define BD_NO_CLOSE_FILES     02
 #define BD_NO_REOPEN_STD_FDS  04
@@ -82,13 +85,4 @@ int becomeDaemon(int flags)
     }
 
     return 0;
-}
-
-int main(int argc,char* argv[])
-{
-    becomeDaemon(0);
-
-    sleep((argc > 1) ? atoi(argv[1]) : 20);
-
-    exit(EXIT_SUCCESS);
 }

@@ -1,4 +1,4 @@
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 
 #include "inet_sockets.h"
 
@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 
 
 int inetConnect(const char *host, const char *service, int type)

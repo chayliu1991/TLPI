@@ -1,5 +1,5 @@
 CC = gcc
-Targets = us_xfr_sv us_xfr_cl ud_ucase_sv ud_ucase_cl read_line i6d_ucase_sv i6d_ucase_cl is_seqnum_sv is_seqnum_cl inet_sockets t_gethostbyname
+Targets = us_xfr_sv us_xfr_cl ud_ucase_sv ud_ucase_cl read_line i6d_ucase_sv i6d_ucase_cl is_seqnum_sv is_seqnum_cl inet_sockets t_gethostbyname id_echo_sv id_echo_cl
 
 all : $(Targets)
 
@@ -36,8 +36,13 @@ inet_sockets:
 	mv libinetsockets.so ../libs
 
 t_gethostbyname:
-	$(CC) $(CFLAGS) -o t_gethostbyname t_gethostbyname.c
+	$(CC) $(CFLAGS) -o t_gethostbyname t_gethostbyname.c 
 
+id_echo_sv:
+	$(CC) $(CFLAGS) -o id_echo_sv id_echo_sv.c  -L../libs -lbecomedaemon -linetsockets
+
+id_echo_cl:
+	$(CC) $(CFLAGS) -o id_echo_cl id_echo_cl.c  -L../libs -lbecomedaemon -linetsockets	
 
 clean:
 	-rm -rf $(Targets)

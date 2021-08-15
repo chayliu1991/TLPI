@@ -8,7 +8,8 @@ print_rlimit :
 
 
 become_daemon:
-	$(CC) $(CFLAGS) -o become_daemon become_daemon.c
+	$(CC) $(CFLAGS) -fPIC -shared -o libbecomedaemon.so become_daemon.c
+	mv libbecomedaemon.so ../libs
 
 daemon_SIGHUP:
 	$(CC) $(CFLAGS) -o daemon_SIGHUP daemon_SIGHUP.c

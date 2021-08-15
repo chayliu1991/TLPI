@@ -36,7 +36,7 @@ int main(int argc,char* argv[])
         if (inet_ntop(AF_INET6, &claddr.sin6_addr, claddrStr,INET6_ADDRSTRLEN) == NULL)
             printf("could not convert client address to string\n");
         else
-            printf("Sever received %ld bytes from (%s,%u)\n",(long)numBytes,claddr,ntohs(claddr.sin6_port));
+            printf("Sever received %ld bytes from (%s,%u)\n",(long)numBytes,claddrStr,ntohs(claddr.sin6_port));
         
         if(sendto(sfd,buf,numBytes,0,(struct sockaddr*)&claddr,len) != numBytes)
             errExit("sendto()");
