@@ -1,6 +1,7 @@
 CC = gcc
 Targets = us_xfr_sv us_xfr_cl ud_ucase_sv ud_ucase_cl read_line i6d_ucase_sv i6d_ucase_cl is_seqnum_sv is_seqnum_cl inet_sockets t_gethostbyname id_echo_sv id_echo_cl \
-		is_echo_sv
+	is_echo_sv rdwrn is_echo_cl
+
 
 all : $(Targets)
 
@@ -47,6 +48,13 @@ id_echo_cl:
 
 is_echo_sv:
 	$(CC) $(CFLAGS) -o is_echo_sv is_echo_sv.c  -L../libs -lbecomedaemon -linetsockets	
+
+rdwrn:
+	$(CC) $(CFLAGS) -shared -fPIC -o librdwrn.so rdwrn.c
+	mv librdwrn.so ../libs
+
+is_echo_cl:
+	$(CC) $(CFLAGS) -o is_echo_cl is_echo_cl.c -L../libs -linetsockets	
 
 clean:
 	-rm -rf $(Targets)
