@@ -304,9 +304,54 @@ TCP 重传算法可能会产生重复的报文，并且根据路由的选择，�
 - `Foreign Address`：对端套接字所绑定的地址，`：`  表示没有对端地址
 - `State`：表示当前套接字所处的状态
 
+# 使用 `tcpdump` 来监视 TCP 流量 
 
+`tcpdump` 可以用来显示所有类型的 TCP/IP 数据包流量。
 
+`tcpdump` 显示的方式：
 
+```
+src > dst:flags data-seqno ack window urg <options>
+```
+
+- `src`：表示源 IP 地址和端口号
+- `dst`：表示目的 IP 地址和端口号
+- `flags`：S(SYN)，F(FIN)，P(PSH)，R(RST)，E(ECE)，C(CWR)
+- `data-seqno`：表示整个数据包中的序列号范围
+- `ack`：表示连接的另一端所期望的下一个字节的序列号
+- `window`：表示对端用于传输的接收缓冲区的空间大小
+- `urg`：表示报文段在指定的偏移上包含紧急数据
+- `options`：描述包含在该报文段中的任意 TCP 选项
+
+# 套接字选项
+
+```
+#include <sys/types.h> 
+#include <sys/socket.h>
+
+int getsockopt(int sockfd, int level, int optname,void *optval, socklen_t *optlen);
+int setsockopt(int sockfd, int level, int optname,const void *optval, socklen_t optlen);
+```
+
+- `level` 指定套接字选项所适用的协议，比如，IP 或者 TCP，`SOL_SOCKET` 表示选项作用于套接字 API 层
+- `optname` 表示希望设定或者取出的套接字选项
+- `optval` 指向缓冲区的指针，用来指定或者返回选项的值
+- `optlen` 指定了 `optval` 所指向的缓冲区空间大小，对于 `setsockopt()` 来说，这个参数是按值传递的，对于 `getsockopt()` 来说，`optlen` 是一个保存结果值的参数
+
+套接字选项的一个简单例子是 `SO_TYPE`，可以用来找出套接字的类型：
+
+```
+int optval;
+socklent_t optlen;
+
+optlen = sizeof(optval);
+if(getsockopt(sfd,SOL_SOCKET,SO_TYPE,&optval,&optlen) == -1)
+	errExit("getsockopt()");
+```
+
+`optval` 就会包含了比如 `SOCK_STREAM` 或者 `SOCK_DGRAM`。
+
+# `SO_REUSEADDR` 套接字选项
 
 
 
