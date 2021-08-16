@@ -58,9 +58,91 @@ IO 多路复用，信号驱动 IO 以及 epoll 都是为了实现：同时检查
 
 # IO 多路复用
 
+IO 多路复用允许同时检查多个文件描述符，可以在普通文件、终端、伪终端、管道、FIFO、套接字以及一些其他类型的字符型设备上使用 `select()` 和 `poll()` 来检查文件描述符。
+
+这两个系统调用都允许进程要么一直等待文件描述符称为就绪状态，要么在调用中指定一个超时时间。
+
 ##  `select()` 系统调用
 
+```
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
 
+int select(int nfds, fd_set *readfds, fd_set *writefds,fd_set *exceptfds, struct timeval *timeout);
+```
+
+- `select()` 会一直阻塞，直到一个或者多个文件描述符集合成为就绪态
+
+### 文件描述符集合
+
+`readfds`，`writefds`，`exceptfds` 都是指向文件描述符集合的指针，所指向的数据类型是 `fd_set`，这些参数按照如下方式使用：
+
+- `readfds`：用来检测输入是否就绪的文件描述符集合
+- `writefds`：用来检测输出是否就绪的文件描述符集合
+- `exceptfds`：用来检测异常情况是否发生的文件描述符集合
+
+在 Linux 上，一个异常情况只会在下面两种情况下发生：
+
+- 连接到处于信包模式下的伪终端主设备上的从设备状态发生了改变
+- 流式套接字上接收到了带外数据
+
+`fd_set` 以位掩码的形式来实现，通过四个宏来实现：
+
+```
+#include <sys/select.h>
+
+void FD_ZERO(fd_set *fdset);
+void FD_SET(int fd, fd_set *fdset);
+void FD_CLR(int fd, fd_set *fdset);
+int  FD_ISSET(int fd, fd_set *fdset);
+```
+
+- `FD_ZERO()`：将 `fdset` 指向的集合初始化为空
+- `FD_SET()`：将 `fd` 添加到 `fdset` 所指向的集合中
+- `FD_CLR()`：将 `fd` 从 `fdset` 所指向的集合中移除
+- `FD_ISSET()`：如果文件描述符 `fd` 是 `fdset` 所指向的集合中的成员，返回 `true`
+
+文件描述符集合有一个最大容量限制，有常量 `FD_SETSIZE` 来决定，在 Linux 上，该常量的值为 1024。
+
+`readfds`，`writefds`，`exceptfds` 所指向的结构体都是保存结果值得地方，在调用 `select()` 之前，这些参数指向的结构体必须初始化(通过 `FD_ZERO()` 和 `FD_SET()` )以包含感兴趣的文件描述符集合。之后 `select()` 调用会修改这些结构体，当 `select()`  返回时，它们包含的就是已处于就绪的文件描述符集合了，如果要在循环中重复调用 `select()`，必须保证每次都要重新初始化它们，之后这些结构体可以通过 `FD_ISSET()` 来检查。如果对某一类的事件不感兴趣，那么相应的 `fd_set` 参数可以指定为 `NULL`。
+
+`nfds` 必须设置为 3 个文件描述符集合中所包含的最大文件描述符号还要大1，该参数让 `select()` 变得更加有效率，因为此时就不用去检查大于这个值得文件描述符符号是否属于这些文件描述符集合。
+
+### `timeout`  参数
+
+`timeout` 指向结构 `timeval`：
+
+``` 
+struct timeval {
+    long    tv_sec;         /* seconds */
+    long    tv_usec;        /* microseconds */
+};
+```
+
+如果 `timeval` 的两个域都是 0 的话，那么 `select()` 将不会阻塞，只是简单地轮询指定的文件描述符集合，看看其中是否有就绪的文件描述符并立刻返回，否则，`timeout` 将为 `select()` 指定一个等待时间的上限值。
+
+SUSv 3要求最大允许的超时时间间隔至少为 31 天。Linux /x86-32 使用 32 位整数作为 `time_t` 的类型，因此上限值可达数年。
+
+`timeout` 指定为 `NULL` 或者指向的结构体字段非零时，`select()` 将阻塞直到有下列事件发生：
+
+- `readfds`，`writefds`，`exceptfds`  中指定的文件描述符中至少有一个称为就绪态
+- 该调用被信号处理例程中断
+- `timeout` 中指定的时间上限已超时
+
+如果 `select()` 因为有一个或多个文件描述符成为就绪态而返回，且如果参数 `timeout` 非空，那么 `select()` 会更新 `timeout` 所指向的结构体以此来表示剩余的超时时间，但是，这种行为是与具体的实现有关，有的实现上不会修改这个结构体。
+
+SUSv3 中规定由  `timeout` 所指向的结构体只有在 `select()` 调用成功返回后才有可能被修改，但是，在 Linux 上如果 `selece()` 被一个信号处理例程中断的话，因此 `select()` 会产生 `EINTR` 错误码，那么该结构体也会被修改以表示剩余的超时时间。
+
+### `select()` 的返回值
+
+`select()` 会返回如下几种情况下的一种：
+
+- 返回 -1表示有错误发生，可能的错误码包括 `EBADF` 和 `EINTR` ：
+  -  `EBADF` 表示 `readfds`，`writefds` 或者 `exceptfds` 中有一个文件描述符是非法的
+  - `EINTR` 表示该调用被信号处理例程中断了
+- 返回 0 表示在任何文件描述符成为就绪之前 `select()` 调用已经超时，在这种情况下，每个返回的文件描述符集合都将被清空
+- 返回一个正整数表示有 1 个或多个文件描述符已达到就绪态，返回值表示处于就绪态的文件描述符的个数，在这种情况下，每个返回的文件描述符集合都需要检查(通过 `FD_ISSET()`)，此时找出发生的 IO 事件是什么，如果同一个文件描述符在  `readfds`，`writefds` ， `exceptfds`  中同时被指定，且对于多个 IO 事件都处于就绪状态的话
 
 ## `poll()` 系统调用
 
