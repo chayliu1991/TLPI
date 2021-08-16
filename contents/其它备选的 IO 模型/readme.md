@@ -142,9 +142,44 @@ SUSv3 中规定由  `timeout` 所指向的结构体只有在 `select()` 调用�
   -  `EBADF` 表示 `readfds`，`writefds` 或者 `exceptfds` 中有一个文件描述符是非法的
   - `EINTR` 表示该调用被信号处理例程中断了
 - 返回 0 表示在任何文件描述符成为就绪之前 `select()` 调用已经超时，在这种情况下，每个返回的文件描述符集合都将被清空
-- 返回一个正整数表示有 1 个或多个文件描述符已达到就绪态，返回值表示处于就绪态的文件描述符的个数，在这种情况下，每个返回的文件描述符集合都需要检查(通过 `FD_ISSET()`)，此时找出发生的 IO 事件是什么，如果同一个文件描述符在  `readfds`，`writefds` ， `exceptfds`  中同时被指定，且对于多个 IO 事件都处于就绪状态的话
+- 返回一个正整数表示有 1 个或多个文件描述符已达到就绪态，返回值表示处于就绪态的文件描述符的个数，在这种情况下，每个返回的文件描述符集合都需要检查(通过 `FD_ISSET()`)，此时找出发生的 IO 事件是什么，如果同一个文件描述符在  `readfds`，`writefds` ， `exceptfds`  中同时被指定，且对于多个 IO 事件都处于就绪状态的话，那么就会被统计多次，换句话说，`selec()` 返回所有在 3 个集合中被标记为就绪态的文件描述符总数。
 
 ## `poll()` 系统调用
+
+```
+#define _GNU_SOURCE
+#include <signal.h>
+#include <poll.h>
+
+int ppoll(struct pollfd *fds, nfds_t nfds,const struct timespec *tmo_p, const sigset_t *sigmask);
+```
+
+-  `poll()` 需要提供一系列的描述符，并在每个文件描述符上标明感兴趣的事件，`fds` 列出了需要 `poll()`  来检查的文件描述符，该参数为 `pollfd` 结构体数组，`nfds` 指定了数组 `fds` 中元素的个数
+
+```
+struct pollfd {
+    int   fd;         /* file descriptor */
+    short events;     /* requested events */
+    short revents;    /* returned events */
+};
+```
+
+- `events` 和 `revents`  字段都是位掩码，调用者初始化 `events` 来指定需要为描述符 `fd` 做检查的事件，当 `poll()` 返回时，`revents` 被设定以此来表示该文件描述符上实际发生的事件
+
+![](./img/pollfd.png)
+
+- 第一组位掩码 `POLLIN`， `POLLRDNORM`， `POLLRDBAND`， `POLLPRI`， `POLLRDHUP`  同输入事件相关
+- 第二组位掩码 `POLLOUT`， `POLLWRNORM`， `POLLWRBAND` 同输出事件相关
+- 第三组位掩码 `POLLERR`， `POLLHUP`， `POLLNVAL` 是设定在 `revents` 字段中用来返回有关文件描述符的附加信息
+- 在 Linux 中，`poll()` 不会用到最后一个位掩码 `POLLMSG`
+
+ 如果对某个特定的文件描述符上的事件不感兴趣，可以将 `events` 设置为 0。给 `fd` 字段指定一个负值将导致对应的 `events`  字段被忽略，并且 `revents` 字段将总是返回 0，这两种方法都可以用来关闭单个文件描述符的检查，而不需要重新建立整个 `fds` 列表。
+
+Linux 的实现：
+
+- `POLLIN` 和 `POLLRDNORM` 是同义词
+- `POLLOUT` 和 `POLLWRNORM` 是同义词
+- `POLLRDBAND` 一般是不被使用的，也就是说在 `events` 字段中会被忽略
 
 
 

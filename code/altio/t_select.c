@@ -23,8 +23,7 @@ static void usageError(const char *progName)
     exit(EXIT_FAILURE);
 }
 
-int
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
     fd_set readfds, writefds;
     int ready, nfds, fd, numRead, j;
