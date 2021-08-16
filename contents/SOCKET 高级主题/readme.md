@@ -448,7 +448,17 @@ Linux 在 UNIX 域套接字上支持 `SOCK_SEQPACKET`，但是 Internet 上，UD
 
 ## SCTP 以及 DCCP 传输层协议
 
-SCTP  和 DCCP  是两个新的传输协议，
+SCTP  和 DCCP  是两个新的传输协议。
+
+流控制传输协议 (SCTP) 被设计来专门支持电话信号，但同时也具有通用的用途，SCTP 提供了可靠，双向，面向连接的传输，SCTP 预留了消息边界。SCTP 的特点就是支持多条数据流，这样就允许多个逻辑上的数据流通过一条单独的连接来传递。
+
+创建 SCTP：
+
+```
+socket(AF_INET,SOCK_STREAM,IPPROTO_SCTP);
+```
+
+DCCP 是一种新的数据报协议——数据报拥塞控制协议，DCCP  具有拥塞控制能力，防止由于数据报的快速传递而使网络过载。DCCP  对于可靠性或按序传递并不做任何保证。
 
 
 
