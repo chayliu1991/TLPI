@@ -493,9 +493,18 @@ struct epoll_event {
     uint32_t     events;      /* Epoll events */
     epoll_data_t data;        /* User data variable */
 };
+
+typedef union epoll_data {
+    void        *ptr;
+    int          fd;
+    uint32_t     u32;
+    uint64_t     u64;
+} epoll_data_t;
 ```
 
+### max_user_watches 上限
 
+因为每个注册到 epoll 实例上的文件描述符需要占用一小段不能被交换的内核内存空间，因此内核提供了一个接口用来定义每个用户可以注册到 epoll 实例上的文件描述符总数。这个上限值可以通过 `max_user_watches ` 来查看和修改。`max_user_watches ` 是专属于 Linux 系统的 `/proc/sys/fd/epoll` 目录下的一个文件。
 
 ## 事件等待
 
