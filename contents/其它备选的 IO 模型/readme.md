@@ -511,20 +511,46 @@ typedef union epoll_data {
 ```
 #include <sys/epoll.h>
 
-int epoll_wait(int epfd, struct epoll_event *events,int maxevents, int timeout);
+int epoll_wait(int epfd, struct epoll_event *evlist,int maxevents, int timeout);
 ```
 
 - `epoll_wait()` 返回 epoll 实例中处于就绪态的文件描述符信息，单个 `epoll_wait()` 调用能返回多个就绪态文件描述符的信息
-- `events` 所指向的结构体数组中返回的是有关就绪态文件描述符的信息，`events` 的空间由调用者负责申请，所包含的元素个数由 `maxevents` 指定
-- 
+- `events` 所指向的结构体数组中返回的是有关就绪态文件描述符的信息，`evlist` 的空间由调用者负责申请，所包含的元素个数由 `maxevents` 指定
+- 数组 `evlist` 中，每个元素返回的都是单个就绪态文件描述符的信息：
+  - `events` 字段返回了在该描述符上已经发生的事件掩码
+  - `data` 字段返回的是描述符上使用 `epoll_ctl()` 注册感兴趣的事件时在  `ev.data` 中所指定的值，`data` 字段是唯一可获知同这个事件相关的文件描述符号的途径，因此，当使用 `epoll_ctl()` 将文件描述符添加到兴趣列表中时，应该要么将 `ev.data.fd` 设为文件描述符号，要么将 `ev.data.ptr` 设为指向包含文件描述符号的结构体
+- `timeout` 用来指定 `epoll_wait()` 的阻塞行为：
+  - 如果 `timeout` 为 -1，调用将一直阻塞，直到兴趣列表中的文件描述符上有事件产生或者直到捕获到一个信号为止
+  - 如果 `timeout` 为 0，执行一次非阻塞式的检查，看兴趣列表中的文件描述符上产生了哪个事件
+  - 如果 `timeout` 大于 0，调用将阻塞至多  timeout 毫秒，直到文件描述符上有事件发生，或者直到捕获到一个信号为止
+- 调用成功后，`epoll_wait()` 返回数组 `evlist` 中的元素个数，如果在 `timeout` 超时间隔内没有任何文件描述符处于就绪态的话，返回 0，出错时返回 -1，并在 `errno` 中设定错误码以表示错误的原因
 
+在多线程程序中，可以在一个线程中使用 `epoll_ctl()` 将文件描述符添加到另一个线程中由 `epoll_wait()` 所监视的 epoll 实例的兴趣列表中。
 
+### epoll 事件
+
+调用 `epoll_ctl()` 时可以在 `ev.events` 中指定的位掩码以及由  `epoll_wait()` 返回的 `evlist[].events` 中的值：
+
+![](./img/events_mask.png)
+
+除了有一个额外的前缀 E 外，大多数这些位掩码的名称同 `poll()` 中对应的事件掩码名称相同。
+
+默认情况下，一旦通过 `epoll_ctl()`  的 `EPOLL_CTL_ADD` 操作将文件描述符添加到 `epoll` 实例的兴趣列表中后，它会保持激活状态，直到显式地通过 `epoll_ctl()` 的 `EPOLL_CTL_DEL` 操作将其从列表中移除。如果希望在某个特定的文件描述符上只得到一次通知，那么可以在传给 `epoll_ctl()` 的 `ev.events` 中指定 `EPOLLONESHOT` 标志。如果指定了这个标志，那么在下一个 `epoll_wait()` 调用通知对应的文件描述符处于就绪态之后，这个描述符就会在兴趣列表中被标记为非激活态，之后的 `epoll_wait()` 调用都不会再通知有关这个描述符的状态了。
 
 ## 深入探究 epoll 语义
 
+当创建一个 epoll  实例时，内核在内存中创建了一个新的 i-node  并打开文件描述，随后在调用进程中为打开的这个文件描述分配一个新的文件描述符。同 `epoll()` 实例的兴趣列表相关联的是打开的文件描述，而不是 epoll 文件描述符，这将产生下列的结果：
 
+- 如果使用 `dup()` 复制一个 epoll 文件描述符，那么被复制的描述符所指代的 epoll 兴趣列表和就绪列表同原始的 epoll 文件描述相同，如要修改兴趣列表，在 `epoll_ctl()` 的参数 `fpfd` 上设定文件描述符可以是原始的也可以是复制的
+- 上一条观点同样适用于 `fork()` 调用之后的情况，此时子进程通过继承复制了父进程的 epoll 文件描述符，而这个复制的文件描述符所指向的 epoll 数据结构同原始的描述符相同
+
+当执行 `epoll_ctl() EPOLL_CTL_ADD` 操作时，内核在 epoll 兴趣列表中添加了一个元素，这个元素同时记录了需要检查的文件描述符数量以及对应的打开文件描述的引用，`epoll_wait()` 调用的目的是让内核负责监视打开的文件描述。一旦所有指向代开的文件描述的文件描述符都被关闭后，这个打开的文件描述将从 epoll 的兴趣列表中移除。
 
 ## epoll 同  IO 多路复用的性能对比
+
+`poll()`，`select()`，`epoll()` 进行 100000次监控所花费的时间：
+
+![](./img/poll_select_epoll.png)
 
 
 
