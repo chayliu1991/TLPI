@@ -508,6 +508,14 @@ typedef union epoll_data {
 
 ## 事件等待
 
+```
+#include <sys/epoll.h>
+
+int epoll_wait(int epfd, struct epoll_event *events,int maxevents, int timeout);
+```
+
+
+
 
 
 ## 深入探究 epoll 语义
