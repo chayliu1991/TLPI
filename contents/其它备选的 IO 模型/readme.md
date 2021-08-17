@@ -180,14 +180,63 @@ Linux 的实现：
 - `POLLIN` 和 `POLLRDNORM` 是同义词
 - `POLLOUT` 和 `POLLWRNORM` 是同义词
 - `POLLRDBAND` 一般是不被使用的，也就是说在 `events` 字段中会被忽略
+- 不会出现当 `POLLOUT`  和 `POLLWRNORM` 没有设定，而设定了 `POLLWRBAND` 的情况
+- 必须定义 `_XOPEN_SOURCE` 测试宏，这样才能在头文件 `<poll.h>` 中得到常量 `POLLRDNORM`，`POLLRDBAND`，  `POLLWRNORM` 以及 `POLLWRBAND` 的定义
+- `POLLRDHUP`  是 Linux 专有标志位，要在头文件 `<poll.h>` 中得到它的定义，必须定义 `_GNU_SOURCE` 测试宏
+- 如果指定的文件描述符在调用 `poll()`  时关闭了，则返回 `POLLNVAL`
 
+### timeout  参数
 
+- 如果 `timeout` 等于 -1，`poll()` 会一直阻塞直到 `fds` 数组中列出的文件描述符有一个达到就绪态或者捕获到一个信号
+- 如果 `timeout` 等于0，`poll()` 不会阻塞，只是执行一次检查看看哪个文件描述符处于就绪态
+- 如果 `timeout` 大于0，`poll()` 至多阻塞 `timeout` 毫秒，直到 `fds` 列出的文件描述符中有一个达到就绪态，或者直到捕获一个信号为止
+
+### `poll()` 的返回值
+
+- 返回 -1 表示有错误发生，一种可能的错误是 `EINTR`，表示该调用被一个信号处理例程中断，`poll()`  绝不会自动恢复
+- 返回 0 表示该调用在任意一个文件描述符就绪态之前就超时了
+- 返回正整数表示有 1个或多个文件描述符处于就绪态，返回值表示数组 `fds` 中拥有非零 `revents`  字段的 `pollfd` 结构体数量
 
 ## 文件描述符何时就绪
 
+文件描述符就绪：如果对 IO 函数调用不会阻塞，而不论该函数是否能够实际传输数据，此时文件描述符(未指定 `O_NONBLOCK`) 被认为是就绪的。
 
+`select()` 和 `poll()` 只会告诉我们 IO 操作是否会阻塞，而不是告诉我们到底能否成功传输数据。
+
+### 普通文件
+
+代表普通文件的文件描述符总是被 `select()` 标记为可读和可写，对于 `poll()` 来说，则会在 `revents`  字段中返回 `POLLIN` 和 `POLLOUT` 标志：
+
+- `read()` 总是会立刻返回数据，文件结尾符或者错误
+- `write()` 总是会立刻传输数据或者因出现某些错误而失败
+
+### 终端和伪终端
+
+终端和伪终端上 `select()` 和 `poll()` 所表示的意义：
+
+![](./img/select_poll_terminal.png)
+
+当伪终端对其中一端处于关闭时，另一端由 `poll()` 返回的 `revents` 将取决于具体实现。
+
+### 管道和 FIFO
+
+`select()` 和 `poll()` 在管道和 FIFO 读端上所表示的意义：
+
+![](./img/select_poll_fifo_rd.png)
+
+`select()` 和 `poll()` 在管道和 FIFO 写端上所表示的意义：
+
+![](./img/select_poll_fifo_wr.png)
+
+### 套接字
+
+套接字上 `select()` 和 `poll()` 所表示的意义：
+
+![](./img/select_poll_socket.png)
 
 ## 比较 `select()` 和 `poll()`
+
+
 
 
 
