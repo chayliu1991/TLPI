@@ -552,11 +552,31 @@ int epoll_wait(int epfd, struct epoll_event *evlist,int maxevents, int timeout);
 
 ![](./img/poll_select_epoll.png)
 
+从上表看出，随着监控文件描述符数量的上升，`poll()`  和 `select()` 的性能表现越来越差，而 `epoll()` 的性能则不受影响。
 
+`epoll()` 表现良好的原因：
 
-
+- 每次调用 `elect()` 和 `poll()` 时，内核必须检查所有在调用中指定的文件描述符，与之相反，当通过 `epoll_ctl()` 指定了需要监视的文件描述符时，内核会在与打开的文件描述符上下文相关联的列表中记录该描述符。之后每当执行 IO 操作使得文件描述符成为就绪态时，内核就在 epoll 描述符的就绪列表中添加一个元素，之后的  `epoll_wait()` 调用从就绪列表中简单地取出这些元素
+- 每次调用 `select()` 或者 `poll()` 时，传递一个标记了所有待监视的文件描述符的数据结构给内核，调用返回时，内核将所有标记为就绪态的文件描述符的数据结构再传回。与之相反，`epoll()` 使用 `epoll_ctl()` 在内核空间中建立一个数据结构，该数据结构会将待监视的文件描述符都记录下来，一旦这个数据结构建立完成，稍后每次调用 `epoll_wait()` 时就不需要再传递任何与文件描述符有关的信息给内核了，而调用返回的信息中只包含了那些已经处于就绪态的描述符
 
 ## 边缘触发通知
+
+默认情况下 `epoll()` 提供的是水平触发通知，这表示会通知何时能在文件描述符上以非阻塞的方式执行 IO 操作。
+
+`epoll()` 还支持边缘触发，这表示会通知自从上一次调用 `epoll_wait()` 以来文件描述符上是否已经有 IO 活动了。
+
+使用 `epoll()` 的边缘触发通知在语义上类似信号驱动 IO，只是如果有多个 IO 事件发生的话，`epoll()` 会将它们合成一次单独的通知，通过 `epoll_wait()` 返回，而在信号驱动 IO 中则可能会产生多个信号。
+
+设置边缘触发：
+
+```
+struct epoll_event ev;
+
+ev.data.fd = fd;
+ev.events = EPOLLIN | EPOLLET;
+if(epoll_ctl(epfd,EPOLLCTL_ADD,fd,ev) == -1)
+	errExit("epoll_ctl()");
+```
 
 
 
