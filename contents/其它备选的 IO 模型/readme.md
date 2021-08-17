@@ -656,11 +656,70 @@ int pselect(int nfds, fd_set *readfds, fd_set *writefds,fd_set *exceptfds, const
 
 - `pselect()` 执行的任务与 `select()` 相似。它们语义上的主要区别在于一个附近的参数 `sigmask`，该参数指定了当调用被阻塞时有哪些信号可以不被过滤掉
 
+```
+ready = pselect(nfds,&readfds,&writefds,&exceptfds,timeout,&sigmask);
+```
 
+上面的调用等用于以原子方式执行：
 
-## self-pipe 技巧
+```
+sigset_t orimask;
 
+sigprocmask(SIG_SETMASK,&sigmask,&orimask);
+ready = select(nfds,&readfds,&writefds,&exceptfds,timeout);
+sigprocmask(SIG_SETMASK,&orimask,NULL);
+```
 
+将  `sigmask`  指定为 `NULL`，则 `pselect()` 与 `select()`  是等同的。
+
+除了 `sigmask` 之外，`pselect()` 与 `select()`  和  `poll()`  的区别还有：
+
+- `pselect()` 中的 `timeout` 参数是一个 `timespec` 结构，允许将超时时间精度指定为纳秒级
+- SUSv3 明确说明 `pselect()` 返回时不会修改 `timeout`  参数
+
+使用 `pselect()`：
+
+```
+sigset_t emptyset,blockset;
+struct sigaction sa;
+
+sigemptyset(&blockset);
+sigaddset(&blockset,SIGUSR1);
+
+if(sigprocmask(SIG_BLOCKm&blockset,NULL) == -1)
+	errExit("sigprocmask()");
+
+sa.sa_sigaction = handler;
+sigemptyset(&sa.sa_mask);
+sa.sa_flags = SA_RESTART;
+if(sigaction(SIGUSR1,&sa,NULL) == -1)
+	errExit("sigaction()");
+
+sigemptyset(&emptyset);
+ready = pselect(nfds,&readfds,NULL,NULL,NULL,&emptyset);
+if(ready == -1)
+	errExit("pselect()");	
+```
+
+### `ppoll()` 和 `epoll_pwait()` 系统调用
+
+`ppoll()` 和 `poll()` 之间的差别类似于 `pselect()` 和 `select()` 之间的差异。
+
+`epoll_pwait()` 是对 `epoll_wait()` 的扩展。
+
+##  self-pipe 技巧
+
+由于 `pselect()` 并没有被广泛实现，因而在可移植程序中通常会用到下列的方法：
+
+- 创建一个管道，将读端和写端都设置为非阻塞
+- 在监视感兴趣的文件描述符时，将管道的读端也包含在参数 `readfds` 中传给 `select()`
+- 为感兴趣的信号安装一个信号处理例程，当这个信号处理例程被调用时，写一个字节的数据到管道中，关于这个信号处理例程，需要注意：
+  - 在第一步中已经将管道的写端设置为非阻塞状态，这是为了防止出现由于信号到来的太快，重复调用信号例程会填满管道空间，结果造成信号处理例程的 `write()` 操作阻塞
+  - 信号处理例程是在管道之后安装的，这是为了防止在管道创建前就发送了信号从而产生竞态条件
+  - 在信号处理例程中使用 `write()` 是安全的，因为 `write()` 是异步信号安全函数之一
+- 在循环中调用  `select()`，这样如果被信号处理例程中断的话，`select()` 还可以重新得到调用
+- `select()` 调用成功后，可以通过检查代表管道读端的文件描述符是否被置于 `readfds` 中来判断信号是否到来
+- 当信号到来时，读取管道中的所有字节，由于可能会有多个信号到来，需要采用一个循环来读取字节直到 `read()` (非阻塞式) 返回 `EAGAIN` 错误码，将管道中的数据全部读取完毕后，接下来就执行必要的操作以作为对发送信号的回应
 
 
 
