@@ -609,8 +609,52 @@ if(epoll_ctl(epfd,EPOLLCTL_ADD,fd,ev) == -1)
 
 # 在信号和文件描述符上等待
 
+进程既要在一组文件描述符上等待 IO 就绪，也要等待发送的信号：
+
+```
+sig_atomic gotSig = 0;
+
+void handler(int sig)
+{
+	gotSig = 1;
+}
+
+int main(int argc,char* argv[])
+{
+	struct sigaction sa;
+	
+	sa.sa_sigaction = handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = 0;
+	if(sigaction(SIGUSR1,&sa,NULL) == -1)
+		errExit("sigaction()");
+
+	
+	ready = selct(nfds,&readfds,NULL,NULL,NULL);
+	if(ready > 0)
+		printf("%d file descriptors ready\n",ready);
+	else if(ready == -1 && errno == EINTR)
+	{
+		if(gotSig)
+			printf("got signal\n");
+		else{
+			/* some other  error */
+		}		
+	}
+}
+```
+
+这段代码的错误在于，如果信号 `SIGUSR1` 到来的时机刚好是在安装信号处理例程之后且在 `select()` 调用之前，那么 `select()` 依然会阻塞。
 
 ## `pselect()` 系统调用
+
+```
+#include <sys/select.h>
+
+int pselect(int nfds, fd_set *readfds, fd_set *writefds,fd_set *exceptfds, const struct timespec *timeout,const sigset_t *sigmask);
+```
+
+- `pselect()` 执行的任务与 `select()` 相似。它们语义上的主要区别在于一个附近的参数 `sigmask`，该参数指定了当调用被阻塞时有哪些信号可以不被过滤掉
 
 
 
