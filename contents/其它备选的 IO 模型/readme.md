@@ -514,7 +514,9 @@ typedef union epoll_data {
 int epoll_wait(int epfd, struct epoll_event *events,int maxevents, int timeout);
 ```
 
-
+- `epoll_wait()` 返回 epoll 实例中处于就绪态的文件描述符信息，单个 `epoll_wait()` 调用能返回多个就绪态文件描述符的信息
+- `events` 所指向的结构体数组中返回的是有关就绪态文件描述符的信息，`events` 的空间由调用者负责申请，所包含的元素个数由 `maxevents` 指定
+- 
 
 
 
