@@ -1,0 +1,59 @@
+EPOLL_CREATE(2)                                                                                                 Linux Programmer's Manual                                                                                                 EPOLL_CREATE(2)
+
+NNAAMMEE
+       epoll_create, epoll_create1 - open an epoll file descriptor
+
+SSYYNNOOPPSSIISS
+       ##iinncclluuddee <<ssyyss//eeppoollll..hh>>
+
+       iinntt eeppoollll__ccrreeaattee((iinntt _s_i_z_e));;
+       iinntt eeppoollll__ccrreeaattee11((iinntt _f_l_a_g_s));;
+
+DDEESSCCRRIIPPTTIIOONN
+       eeppoollll__ccrreeaattee() creates an eeppoollll(7) instance.  Since Linux 2.6.8, the _s_i_z_e argument is ignored, but must be greater than zero; see NOTES below.
+
+       eeppoollll__ccrreeaattee()  returns  a file descriptor referring to the new epoll instance.  This file descriptor is used for all the subsequent calls to the eeppoollll interface.  When no longer required, the file descriptor returned by eeppoollll__ccrreeaattee() should
+       be closed by using cclloossee(2).  When all file descriptors referring to an epoll instance have been closed, the kernel destroys the instance and releases the associated resources for reuse.
+
+   eeppoollll__ccrreeaattee11(())
+       If _f_l_a_g_s is 0, then, other than the fact that the obsolete _s_i_z_e argument is dropped, eeppoollll__ccrreeaattee11() is the same as eeppoollll__ccrreeaattee().  The following value can be included in _f_l_a_g_s to obtain different behavior:
+
+       EEPPOOLLLL__CCLLOOEEXXEECC
+              Set the close-on-exec (FFDD__CCLLOOEEXXEECC) flag on the new file descriptor.  See the description of the OO__CCLLOOEEXXEECC flag in ooppeenn(2) for reasons why this may be useful.
+
+RREETTUURRNN VVAALLUUEE
+       On success, these system calls return a nonnegative file descriptor.  On error, -1 is returned, and _e_r_r_n_o is set to indicate the error.
+
+EERRRROORRSS
+       EEIINNVVAALL _s_i_z_e is not positive.
+
+       EEIINNVVAALL (eeppoollll__ccrreeaattee11()) Invalid value specified in _f_l_a_g_s.
+
+       EEMMFFIILLEE The per-user limit on the number of epoll instances imposed by _/_p_r_o_c_/_s_y_s_/_f_s_/_e_p_o_l_l_/_m_a_x___u_s_e_r___i_n_s_t_a_n_c_e_s was encountered.  See eeppoollll(7) for further details.
+
+       EEMMFFIILLEE The per-process limit on the number of open file descriptors has been reached.
+
+       EENNFFIILLEE The system-wide limit on the total number of open files has been reached.
+
+       EENNOOMMEEMM There was insufficient memory to create the kernel object.
+
+VVEERRSSIIOONNSS
+       eeppoollll__ccrreeaattee() was added to the kernel in version 2.6.  Library support is provided in glibc starting with version 2.3.2.
+
+       eeppoollll__ccrreeaattee11() was added to the kernel in version 2.6.27.  Library support is provided in glibc starting with version 2.9.
+
+CCOONNFFOORRMMIINNGG TTOO
+       eeppoollll__ccrreeaattee() is Linux-specific.
+
+NNOOTTEESS
+       In the initial eeppoollll__ccrreeaattee() implementation, the _s_i_z_e argument informed the kernel of the number of file descriptors that the caller expected to add to the eeppoollll instance.  The kernel used this information as a hint for the amount  of  space
+       to  initially  allocate in internal data structures describing events.  (If necessary, the kernel would allocate more space if the caller's usage exceeded the hint given in _s_i_z_e.)  Nowadays, this hint is no longer required (the kernel dynami‐
+       cally sizes the required data structures without needing the hint), but _s_i_z_e must still be greater than zero, in order to ensure backward compatibility when new eeppoollll applications are run on older kernels.
+
+SSEEEE AALLSSOO
+       cclloossee(2), eeppoollll__ccttll(2), eeppoollll__wwaaiitt(2), eeppoollll(7)
+
+CCOOLLOOPPHHOONN
+       This page is part of release 4.04 of the Linux _m_a_n_-_p_a_g_e_s project.  A description of the project, information about reporting bugs, and the latest version of this page, can be found at http://www.kernel.org/doc/man-pages/.
+
+Linux                                                                                                                   2015-12-28                                                                                                        EPOLL_CREATE(2)

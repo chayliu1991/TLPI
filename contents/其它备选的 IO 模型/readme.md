@@ -462,9 +462,38 @@ epoll API 由以下 3 个系统调用组成：
 
 ## 创建 epoll 实例
 
+```
+#include <sys/epoll.h>
 
+int epoll_create(int size);
+```
+
+- `epoll_create()` 创建一个新的 epoll 实例，其对应的兴趣列表初始化为空
+- `size` 指定了想要通过 epoll 实例来检查的文件描述符个数，该参数并不是一个上限，而是告诉内核应该如何为内部数据结构划分初始大小
+- `epoll_create()` 返回了代表新创建的 epoll 实例的文件描述符，这个文件描述符在其他几个 epoll 系统调用中用来表示 epoll 实例，当这个文件描述符不再需要时，应该通过 `close()`  来关闭，当所有的 epoll 实例相关的文件描述符都被关闭时，实例被销毁，返还相关的资源
 
 ## 修改 epoll 的兴趣列表
+
+```
+#include <sys/epoll.h>
+
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
+```
+
+- `epoll_ctl()` 能够修改由文件描述符 `epfd` 所代表的 epoll 实例中的感兴趣列表
+- `fd` 表明了要修改兴趣列表中的哪一个文件描述符的设定，该参数可以代表管道，FIFO，套接字，POSIX 消息队列，inotify 实例，终端，设备，甚至是另一个 epoll 实例的文件描述符，但是不能是普通文件或目录的文件描述符，否则会出现 EPERM 错误
+- `op` 用来指定需要执行的操作，可以是如下的几种值：
+  - `EPOLL_CTL_ADD`：将描述符 `fd`  添加到 epoll 实例 `epfd` 中的兴趣列表中去，对于 `fd` 感兴趣的事件，都指定在 `ev` 所指向的结构体中，添加一个已经 存在的文件描述符，将出现 `EEXIST` 错误
+  - `EPOLL_CTL_MOD`：修改描述符 `fd` 上设定的事件，需要用到 `ev` 所指向的结构体中的信息，如果视图修改不在兴趣列表中的文件描述符，将出现 `ENOENT` 错误
+  - `EPOLL_CTL_DEL`：将文件描述符 `fd` 从 `epfd` 的兴趣列表中移除，该操作忽略参数 `ev`，如果视图移除一个不在 `epfd` 的兴趣列表中的文件描述符，将出现 `ENOENT`  错误。关闭一耳光文件描述符会自动将其从所有的 epoll 实例的兴趣列表中移除
+- `ev`  指向  `epoll_event` 结构：
+
+```
+struct epoll_event {
+    uint32_t     events;      /* Epoll events */
+    epoll_data_t data;        /* User data variable */
+};
+```
 
 
 
